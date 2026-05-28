@@ -18,7 +18,7 @@ export async function redirectUrl(req, res, next) {
     if (!originalUrl) {
       return res.status(404).json({ message: "URL not found" });
     }
-
+    console.log(originalUrl);
     res.redirect(originalUrl);
   } catch (error) {
     next(error);

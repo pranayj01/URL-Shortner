@@ -20,15 +20,19 @@ export async function createShortUrl(originalUrl) {
   return  {shortCode: code};
 }
 
-export async function findOriginalUrl(code) {
-  // TODO: implement lookup logic for the original URL by short code
-  if (code) {
+
+
+export async function findOriginalUrl(code){
+
     const urlEntry = await prisma.url.findUnique({
-      where: {
-        shortCode: code
-      }
+        where:{
+            shortCode: code
+        }
     });
-    return urlEntry ? urlEntry.originalUrl : null;
-  }
-  return null;
+
+    if(!urlEntry){
+        return null;
+    }
+
+    return urlEntry.originalUrl;
 }
