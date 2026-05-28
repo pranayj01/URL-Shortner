@@ -1,10 +1,12 @@
 import { createShortUrl, findOriginalUrl } from "../services/urlService.js";
 
 export async function shortenUrl(req, res, next) {
+  throw new Error("Testing error handling");
   try {
     const { originalUrl } = req.body;
     const result = await createShortUrl(originalUrl);
     res.status(201).json(result);
+    
   } catch (error) {
     next(error);
   }
@@ -23,4 +25,5 @@ export async function redirectUrl(req, res, next) {
   } catch (error) {
     next(error);
   }
+  
 }
