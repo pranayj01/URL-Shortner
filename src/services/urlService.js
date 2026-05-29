@@ -1,11 +1,12 @@
 import prisma from "../config/db.js";
 import { encodeToBase62 } from "../utils/base62.js";
 
-export async function createShortUrl(originalUrl) {
+export async function createShortUrl(originalUrl,expiresAt) {
  
   const urlEntry = await prisma.url.create({
     data:{
-        originalUrl: originalUrl
+        originalUrl: originalUrl,
+        expiresAt: expiresAt
     }
 });
   const code = encodeToBase62(urlEntry.id);
@@ -27,11 +28,17 @@ export async function findOriginalUrl(code){
     const urlEntry = await prisma.url.findUnique({
         where:{
             shortCode: code
+            
         }
     });
 
     if(!urlEntry){
         return null;
+    }
+
+    if(urlEntry.expiresAt && urlEntry.expiresAt < new Date()){
+        throw new Error("URL has expired");
+
     }
 
     return urlEntry.originalUrl;
