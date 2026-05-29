@@ -3,8 +3,8 @@ import { createShortUrl, findOriginalUrl } from "../services/urlService.js";
 export async function shortenUrl(req, res, next) {
   
   try {
-    const { originalUrl,expiresAt } = req.body;
-    const result = await createShortUrl(originalUrl,expiresAt);
+    const { originalUrl,expiresAt,customAlias } = req.body;
+    const result = await createShortUrl(originalUrl,expiresAt,customAlias);
     res.status(201).json(result);
     
   } catch (error) {
