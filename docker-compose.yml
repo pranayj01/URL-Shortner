@@ -1,5 +1,5 @@
 services:
-  
+
   postgres:
     image: postgres:16
     container_name: postgres
@@ -9,4 +9,15 @@ services:
       POSTGRES_DB: mydb
     ports:
       - "5432:5432"
-    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
