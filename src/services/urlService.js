@@ -13,10 +13,17 @@ export async function createShortUrl(originalUrl,expiresAt,customAlias) {
     if(existing){
         throw new Error("Custom alias already in use");
     }
+    await prisma.url.create({
+        data:{
+            originalUrl,
+            expiresAt,
+            shortCode: customAlias
+        }
+    });
     
     return {shortCode: customAlias};
   }
-  
+
   const urlEntry = await prisma.url.create({
     data:{
         originalUrl: originalUrl,
