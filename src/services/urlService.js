@@ -2,14 +2,7 @@ import prisma from "../config/db.js";
 import { encodeToBase62 } from "../utils/base62.js";
 
 export async function createShortUrl(originalUrl,expiresAt,customAlias) {
-  const urlEntry = await prisma.url.create({
-    data:{
-        originalUrl: originalUrl,
-        expiresAt: expiresAt,
-        shortCode: customAlias
-    }
-});
-  
+
     if(customAlias){
     const existing = await prisma.url.findUnique({
         where:{
@@ -23,6 +16,16 @@ export async function createShortUrl(originalUrl,expiresAt,customAlias) {
     
     return {shortCode: customAlias};
   }
+  
+  const urlEntry = await prisma.url.create({
+    data:{
+        originalUrl: originalUrl,
+        expiresAt: expiresAt,
+        shortCode: customAlias
+    }
+});
+  
+    
   
     
   const code = encodeToBase62(urlEntry.id);
