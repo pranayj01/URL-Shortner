@@ -50,7 +50,7 @@ export async function createShortUrl(originalUrl,expiresAt,customAlias) {
 
 
 export async function findOriginalUrl(code){
-
+    
     const urlEntry = await prisma.url.findUnique({
         where:{
             shortCode: code
@@ -67,5 +67,8 @@ export async function findOriginalUrl(code){
 
     }
 
-    return urlEntry.originalUrl;
+    return {
+        originalUrl: urlEntry.originalUrl,
+        expiresAt: urlEntry.expiresAt
+    }
 }
