@@ -19,7 +19,7 @@ export async function redirectUrl(req, res, next) {
     let cachedUrl = null;
 
     try {
-      if (redisClient.isReady) {
+      if (redisClient?.isReady) {
         cachedUrl = await redisClient.get(key);
       }
     } catch (err) {
@@ -42,7 +42,7 @@ export async function redirectUrl(req, res, next) {
   
 
     try {
-      if (redisClient.isReady) {
+      if (redisClient?.isReady) {
         if (expiresAt) {
           
           const ttlSeconds = Math.floor(
