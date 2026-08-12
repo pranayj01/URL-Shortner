@@ -1,6 +1,6 @@
 {
   "name": "url-shortener",
-  "install": "npm install && DATABASE_URL=\"postgresql://postgres:password@localhost:5432/mydb\" npx prisma generate",
+  "install": "bash .cursor/install.sh",
   "start": "bash .cursor/start.sh",
   "terminals": [
     {
