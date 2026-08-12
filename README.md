@@ -103,33 +103,55 @@ npm run benchmark:redirect
 
 Environment: Windows 11, Node 22, embedded PostgreSQL 18 + Memurai (via `redis-memory-server`), August 12, 2026.
 
-## Fix Render deploy (2 clicks)
+## Deploy on Render (resume-ready live link)
 
-Your logs still show the **old internal** database:
+No special code changes are required. Create **3 services** in the same region, then set env vars.
 
-`dpg-d8cu1i42m8qs73e4r76g-a` (no `.render.com`)
+### 1) PostgreSQL
 
-and Render is starting with:
+1. **New +** → **PostgreSQL**
+2. Create it and wait until it is available
+3. Open **Connections** → copy **External Database URL**  
+   (must contain `.oregon-postgres.render.com` or similar)
 
-`npx prisma migrate deploy && npm start`
+### 2) Redis
 
-That command talks to the database **before** the app can fix the URL, so deploy dies.
+1. **New +** → **Key Value** (Redis)
+2. Same region as Postgres
+3. Copy **Internal Redis URL** (or External if shown)
 
-Do only this:
+### 3) Web Service
 
-1. Web service → **Settings** → **Start Command**
-   - Delete the current command
-   - Put only: `npm start`
-   - Save
+1. **New +** → **Web Service** → connect your GitHub repo `URL-Shortner`
+2. Settings:
+   - **Runtime:** Node
+   - **Build Command:** `npm install && npx prisma generate`
+   - **Start Command:** `npm start`
+3. Environment variables:
 
-2. Web service → **Environment** → `DATABASE_URL`
-   - Open it and check the text
-   - It **must** contain `.render.com`
-   - If it does not, you still have the Internal URL. Go to the Postgres page → copy **External Database URL** → paste it here → Save
+| Key | Value |
+|-----|--------|
+| `DATABASE_URL` | Postgres **External** URL from step 1 |
+| `REDIS_URL` | Redis URL from step 2 |
+| `BASE_URL` | Your site URL, e.g. `https://your-app.onrender.com` |
+| `NODE_ENV` | `production` |
 
-3. Click **Manual Deploy**
+4. Deploy
+5. Open the public URL Render gives you
 
-When it works, logs will say `Using database host:` and the host will include `.render.com` or `.internal`.
+### Smoke test before putting it on your resume
+
+1. Open `/health` → should show postgres `up` (and redis `up` if Redis is set)
+2. Create a short link → the result must start with your Render URL, **not** `localhost`
+3. Open the short link → it should redirect
+4. Look up stats with the short code → `Clicks` should increase
+
+### Common mistakes
+
+- Build Command must **not** be `npm start`
+- `DATABASE_URL` must be the **External** URL (host includes `.render.com`)
+- `BASE_URL` must be `https://your-app.onrender.com` (no trailing slash)
+- Free Render apps sleep when idle; first request can take ~30–60s
 
 ## Intentionally deferred
 
