@@ -1,0 +1,11 @@
+{
+  "name": "url-shortener",
+  "install": "npm install && DATABASE_URL=\"postgresql://postgres:password@localhost:5432/mydb\" npx prisma generate",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "app",
+      "command": "DATABASE_URL=\"postgresql://postgres:password@localhost:5432/mydb\" REDIS_URL=\"redis://localhost:6379\" PORT=3000 npm run dev"
+    }
+  ]
+}
