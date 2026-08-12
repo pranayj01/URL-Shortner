@@ -103,27 +103,33 @@ npm run benchmark:redirect
 
 Environment: Windows 11, Node 22, embedded PostgreSQL 18 + Memurai (via `redis-memory-server`), August 12, 2026.
 
-## Fix Render deploy (do this in the dashboard)
+## Fix Render deploy (2 clicks)
 
-The code cannot log into your Render account. These env/start settings are what actually unblock P1001 and analytics.
+Your logs still show the **old internal** database:
 
-1. Open the **Postgres** service → **Info** → **Connections**.
-2. Copy **External Database URL** (host must look like `dpg-….oregon-postgres.render.com`).
-   - Do **not** use Internal Database URL (`dpg-….` with no `.render.com`). That is what caused `P1001`.
-3. Open the **Web** service → **Environment**.
-   - Set `DATABASE_URL` = that External URL.
-   - Set `NODE_ENV` = `production`.
-   - Optional: `REDIS_URL` if you have a Render Redis instance. Analytics still works without Redis.
-4. Web service **Settings**:
-   - If this is a **Docker** deploy: leave Start Command empty (the Dockerfile already runs `node src/start.js`).
-   - If this is a **Node** deploy:
-     - Build Command: `npm install && npx prisma generate`
-     - Start Command: `npm start`
-   - Do **not** run `prisma migrate deploy` in the **Build** command. Render’s build network cannot reach the database.
-5. **Manual Deploy** → **Deploy latest commit**.
-6. In logs you should see `Using database host: …render.com` then `Server running on port …` and `Click worker starting`.
+`dpg-d8cu1i42m8qs73e4r76g-a` (no `.render.com`)
 
-If it still fails, the database may be paused or the password was rotated — copy a fresh External URL from the Postgres page.
+and Render is starting with:
+
+`npx prisma migrate deploy && npm start`
+
+That command talks to the database **before** the app can fix the URL, so deploy dies.
+
+Do only this:
+
+1. Web service → **Settings** → **Start Command**
+   - Delete the current command
+   - Put only: `npm start`
+   - Save
+
+2. Web service → **Environment** → `DATABASE_URL`
+   - Open it and check the text
+   - It **must** contain `.render.com`
+   - If it does not, you still have the Internal URL. Go to the Postgres page → copy **External Database URL** → paste it here → Save
+
+3. Click **Manual Deploy**
+
+When it works, logs will say `Using database host:` and the host will include `.render.com` or `.internal`.
 
 ## Intentionally deferred
 

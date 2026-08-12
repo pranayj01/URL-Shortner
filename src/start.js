@@ -4,6 +4,13 @@ import { applyDatabaseUrl } from "./config/databaseUrl.js";
 
 applyDatabaseUrl();
 
+try {
+  const host = new URL(process.env.DATABASE_URL).hostname;
+  console.log(`Using database host: ${host}`);
+} catch {
+  console.log("DATABASE_URL is missing or invalid");
+}
+
 const runMigrations =
   process.env.RUN_MIGRATIONS === "true" ||
   process.env.NODE_ENV === "production";
@@ -55,13 +62,6 @@ process.on("SIGINT", () => shutdown(0));
 
 if (runMigrations) {
   await runMigrate();
-}
-
-try {
-  const host = new URL(process.env.DATABASE_URL).hostname;
-  console.log(`Using database host: ${host}`);
-} catch {
-  console.log("DATABASE_URL is missing or invalid");
 }
 
 children.push(spawnNode("server", "src/server.js", { START_WORKER: "false" }));
