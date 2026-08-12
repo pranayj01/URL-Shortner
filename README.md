@@ -7,7 +7,7 @@ A learning-focused URL shortener built with Express, PostgreSQL (Prisma), and Re
 - Create short links (Base62 from DB id or custom alias)
 - Optional expiry
 - Redirect with Redis read-through cache
-- Click counting (async, non-blocking)
+- Click counting (async, non-blocking via Redis queue + worker)
 - IP-based rate limiting before cache/database access
 - Health check for Postgres + Redis
 - Simple UI to create links and look up stats
@@ -20,6 +20,12 @@ docker compose up --build
 ```
 
 Open http://localhost:3000
+
+Start the analytics worker in a separate terminal:
+
+```bash
+npm run worker:clicks
+```
 
 ## Local development
 
@@ -65,8 +71,11 @@ Redis Cache
  ↓
 PostgreSQL
  ↓
-302 redirect (+ async clickCount++)
+302 redirect (clickCount updated asynchronously)
 ```
+
+Click analytics is intentionally kept out of the critical redirect path:
+redirects enqueue events into a Redis List, and a background worker persists them to PostgreSQL.
 
 Rate limiting is IP-based only — it is not tied to a specific short code or URL path. The middleware runs before Redis or Postgres are contacted.
 

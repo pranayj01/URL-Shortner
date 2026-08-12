@@ -1,6 +1,11 @@
 import prisma from "../config/db.js";
 import { encodeToBase62 } from "../utils/base62.js";
 import { AppError } from "../utils/AppError.js";
+import redisClient from "../config/redis.js";
+
+const CLICK_QUEUE_KEY = process.env.CLICK_QUEUE_KEY || "clicks:queue";
+const CLICK_PROCESSING_KEY =
+  process.env.CLICK_PROCESSING_KEY || "clicks:processing";
 
 export async function createShortUrl(originalUrl, expiresAt, customAlias) {
   if (customAlias) {
@@ -77,13 +82,74 @@ export async function getUrlStats(code) {
   return urlEntry;
 }
 
-export function recordClick(code) {
-  prisma.url
-    .updateMany({
-      where: { shortCode: code },
-      data: { clickCount: { increment: 1 } },
-    })
-    .catch((err) => {
-      console.error("Failed to record click:", err.message);
+function buildClickEvent(shortCode, clickedAt = new Date()) {
+  return {
+    shortCode,
+    clickedAt: clickedAt.toISOString(),
+  };
+}
+
+// Producer: must not block redirect path.
+export function enqueueClickEvent(shortCode) {
+  if (!redisClient?.isReady) return;
+  if (!shortCode || typeof shortCode !== "string") return;
+
+  const event = buildClickEvent(shortCode);
+  const payload = JSON.stringify(event);
+
+  // Fire-and-forget. If Redis is unavailable, analytics will lag (redirect remains fast).
+  redisClient
+    .rPush(CLICK_QUEUE_KEY, payload)
+    .catch((err) => console.error("Failed to enqueue click:", err.message));
+}
+
+function isValidEvent(evt) {
+  if (!evt || typeof evt !== "object") return false;
+  if (typeof evt.shortCode !== "string" || evt.shortCode.length === 0)
+    return false;
+  if (!evt.clickedAt || typeof evt.clickedAt !== "string") return false;
+  const d = new Date(evt.clickedAt);
+  return !Number.isNaN(d.getTime());
+}
+
+export async function persistClickEvent(rawPayload) {
+  let evt;
+  try {
+    evt = typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
+  } catch {
+    return { ok: false, reason: "malformed_json" };
+  }
+
+  if (!isValidEvent(evt)) return { ok: false, reason: "invalid_event" };
+
+  const clickedAt = new Date(evt.clickedAt);
+  const shortCode = evt.shortCode;
+
+  // At-least-once semantics: worker may retry and create duplicates in ClickEvent.
+  // For this learning project, we keep the logic simple and resilient.
+  await prisma.$transaction(async (tx) => {
+    await tx.clickEvent.create({
+      data: {
+        shortCode,
+        clickedAt,
+      },
     });
+
+    await tx.url.updateMany({
+      where: { shortCode },
+      data: { clickCount: { increment: 1 } },
+    });
+  });
+
+  return { ok: true };
+}
+
+export async function requeueProcessingItem(rawPayload) {
+  if (!redisClient?.isReady) return;
+  await redisClient
+    .rPush(CLICK_QUEUE_KEY, rawPayload)
+    .catch(() => {});
+  await redisClient
+    .lRem(CLICK_PROCESSING_KEY, 0, rawPayload)
+    .catch(() => {});
 }

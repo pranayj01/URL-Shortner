@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "worker:clicks": "node src/workers/clickWorker.js",
     "benchmark:redirect": "node scripts/benchmark-redirect.mjs"
   },
   "keywords": [],

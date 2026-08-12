@@ -29,3 +29,13 @@ model Url {
   userId      Int?
   user        User?     @relation(fields: [userId], references: [id])
 }
+
+model ClickEvent {
+  id         Int      @id @default(autoincrement())
+  shortCode  String
+  clickedAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([shortCode])
+  @@index([clickedAt])
+}

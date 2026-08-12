@@ -2,7 +2,7 @@ import {
   createShortUrl,
   findOriginalUrl,
   getUrlStats,
-  recordClick,
+  enqueueClickEvent,
 } from "../services/urlService.js";
 import redisClient from "../config/redis.js";
 
@@ -43,7 +43,8 @@ export async function redirectUrl(req, res, next) {
     }
 
     if (cachedUrl) {
-      recordClick(code);
+      // Analytics is enqueued asynchronously; redirect should not wait.
+      enqueueClickEvent(code);
       return res.redirect(cachedUrl);
     }
 
@@ -73,7 +74,8 @@ export async function redirectUrl(req, res, next) {
       console.error("Redis unavailable");
     }
 
-    recordClick(code);
+    // Analytics is enqueued asynchronously; redirect should not wait.
+    enqueueClickEvent(code);
     return res.redirect(originalUrl);
   } catch (error) {
     next(error);
