@@ -6,7 +6,8 @@ A learning-focused URL shortener built with Express, PostgreSQL (Prisma), and Re
 
 - Create short links (Base62 from DB id or custom alias)
 - Optional expiry
-- Redirect with Redis read-through cache
+- Redirect with Redis read-through cache (public — no login)
+- Login/register so only the creator can view link insights
 - Click counting (async, non-blocking via Redis queue + worker)
 - IP-based rate limiting before cache/database access
 - Health check for Postgres + Redis
@@ -43,9 +44,13 @@ Open http://localhost:3000
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/shorten` | Create short URL. Body: `{ originalUrl, customAlias?, expiresAt? }` |
-| `GET` | `/api/urls/:code` | Stats: original URL, clicks, expiry |
-| `GET` | `/:code` | Redirect to original URL |
+| `POST` | `/api/auth/register` | Create account `{ email, password }` |
+| `POST` | `/api/auth/login` | Login → `{ token, user }` |
+| `GET` | `/api/auth/me` | Current user (Bearer token) |
+| `POST` | `/api/shorten` | Create short URL (login required) |
+| `GET` | `/api/urls/mine` | List your links (login required) |
+| `GET` | `/api/urls/:code` | Stats for a link you own (login required) |
+| `GET` | `/:code` | Redirect to original URL (public) |
 | `GET` | `/health` | Liveness + dependency status |
 
 ### Example
@@ -135,6 +140,7 @@ No special code changes are required. Create **3 services** in the same region, 
 | `REDIS_URL` | Redis URL from step 2 |
 | `BASE_URL` | Your site URL, e.g. `https://your-app.onrender.com` |
 | `NODE_ENV` | `production` |
+| `JWT_SECRET` | A long random string (login tokens) |
 
 4. Deploy
 5. Open the public URL Render gives you
@@ -155,7 +161,7 @@ No special code changes are required. Create **3 services** in the same region, 
 
 ## Intentionally deferred
 
-- Auth / sessions / owned-link dashboards
+- OAuth / social login
 - Automated tests
 - Custom domains / QR codes
 

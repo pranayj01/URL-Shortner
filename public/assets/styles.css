@@ -259,7 +259,99 @@ button.ghost:hover {
   }
 }
 
+.brand-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.auth-status {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  animation: rise 0.7s ease 0.1s both;
+}
+
+.auth-email {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.panel h2,
+.panel h3 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.panel h2 {
+  font-size: 1.35rem;
+}
+
+.panel h3 {
+  font-size: 1.1rem;
+}
+
+.my-links {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.my-links-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.mine-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.mine-list li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.92rem;
+}
+
+.mine-list a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mine-list a:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 640px) {
+  .brand-row {
+    flex-direction: column;
+  }
+
   .row,
   .stats-form {
     grid-template-columns: 1fr;

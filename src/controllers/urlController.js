@@ -1,13 +1,13 @@
 import {
   createShortUrl,
   findOriginalUrl,
-  getUrlStats,
+  getUrlStatsForOwner,
+  listUrlsForUser,
   enqueueClickEvent,
 } from "../services/urlService.js";
 import redisClient from "../config/redis.js";
 
 function buildShortUrl(shortCode) {
-  // Prefer explicit BASE_URL, then Render's public URL, then localhost for local dev.
   const base = (
     process.env.BASE_URL ||
     process.env.RENDER_EXTERNAL_URL ||
@@ -19,7 +19,12 @@ function buildShortUrl(shortCode) {
 export async function shortenUrl(req, res, next) {
   try {
     const { originalUrl, expiresAt, customAlias } = req.body;
-    const result = await createShortUrl(originalUrl, expiresAt, customAlias);
+    const result = await createShortUrl(
+      originalUrl,
+      expiresAt,
+      customAlias,
+      req.user.id
+    );
     res.status(201).json({
       shortCode: result.shortCode,
       shortUrl: buildShortUrl(result.shortCode),
@@ -45,7 +50,6 @@ export async function redirectUrl(req, res, next) {
     }
 
     if (cachedUrl) {
-      // Analytics is enqueued asynchronously; redirect should not wait.
       enqueueClickEvent(code);
       return res.redirect(cachedUrl);
     }
@@ -76,7 +80,6 @@ export async function redirectUrl(req, res, next) {
       console.error("Redis unavailable");
     }
 
-    // Analytics is enqueued asynchronously; redirect should not wait.
     enqueueClickEvent(code);
     return res.redirect(originalUrl);
   } catch (error) {
@@ -88,16 +91,29 @@ export async function urlStats(req, res, next) {
   try {
     let { code } = req.params;
 
-    // If someone pasted a full short URL into the path somehow, keep the last segment.
     if (code.includes("/")) {
       const parts = code.split("/").filter(Boolean);
       code = parts[parts.length - 1];
     }
 
-    const stats = await getUrlStats(code);
+    const stats = await getUrlStatsForOwner(code, req.user.id);
     res.json({
       ...stats,
       shortUrl: buildShortUrl(stats.shortCode),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function myUrls(req, res, next) {
+  try {
+    const urls = await listUrlsForUser(req.user.id);
+    res.json({
+      urls: urls.map((u) => ({
+        ...u,
+        shortUrl: buildShortUrl(u.shortCode),
+      })),
     });
   } catch (error) {
     next(error);

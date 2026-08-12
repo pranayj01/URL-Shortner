@@ -16,9 +16,36 @@
     <div class="bg" aria-hidden="true"></div>
     <main class="shell">
       <header class="brand">
-        <p class="brand-mark">Shortlink</p>
-        <p class="tagline">Shorten a URL. Share it. Track the clicks.</p>
+        <div class="brand-row">
+          <div>
+            <p class="brand-mark">Shortlink</p>
+            <p class="tagline">Shorten a URL. Share it. Track your clicks privately.</p>
+          </div>
+          <div id="auth-status" class="auth-status"></div>
+        </div>
       </header>
+
+      <section class="panel" id="auth-panel" aria-labelledby="auth-heading">
+        <h2 id="auth-heading">Account</h2>
+        <p class="hint">
+          Anyone can open a short link. Login is required to create links and view your insights.
+        </p>
+        <form id="auth-form" autocomplete="on">
+          <label class="field">
+            <span>Email</span>
+            <input id="authEmail" name="email" type="email" required placeholder="you@example.com" />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="authPassword" name="password" type="password" required minlength="6" placeholder="At least 6 characters" />
+          </label>
+          <div class="auth-actions">
+            <button type="submit" id="login-btn">Log in</button>
+            <button type="button" id="register-btn" class="ghost">Create account</button>
+          </div>
+          <p id="auth-error" class="error" hidden></p>
+        </form>
+      </section>
 
       <section class="panel" aria-labelledby="shorten-heading">
         <h1 id="shorten-heading" class="visually-hidden">Create a short link</h1>
@@ -66,7 +93,8 @@
       </section>
 
       <section class="panel stats-panel" aria-labelledby="stats-heading">
-        <h2 id="stats-heading">Look up stats</h2>
+        <h2 id="stats-heading">Your insights</h2>
+        <p class="hint">Only you can see stats for links you created while logged in.</p>
         <form id="stats-form" class="stats-form" autocomplete="off">
           <label class="field grow">
             <span>Short code or short link</span>
@@ -82,6 +110,15 @@
         </form>
         <p id="stats-error" class="error" hidden></p>
         <dl id="stats-result" class="stats" hidden></dl>
+
+        <div class="my-links">
+          <div class="my-links-header">
+            <h3>My links</h3>
+            <button type="button" id="refresh-mine" class="ghost">Refresh</button>
+          </div>
+          <ul id="mine-list" class="mine-list"></ul>
+          <p id="mine-empty" class="hint" hidden>No links yet. Create one after logging in.</p>
+        </div>
       </section>
     </main>
     <script src="/assets/app.js" type="module"></script>

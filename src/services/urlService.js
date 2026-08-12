@@ -7,7 +7,16 @@ const CLICK_QUEUE_KEY = process.env.CLICK_QUEUE_KEY || "clicks:queue";
 const CLICK_PROCESSING_KEY =
   process.env.CLICK_PROCESSING_KEY || "clicks:processing";
 
-export async function createShortUrl(originalUrl, expiresAt, customAlias) {
+export async function createShortUrl(
+  originalUrl,
+  expiresAt,
+  customAlias,
+  userId
+) {
+  if (!userId) {
+    throw new AppError("Login required to create short links", 401);
+  }
+
   if (customAlias) {
     const existing = await prisma.url.findUnique({
       where: { shortCode: customAlias },
@@ -22,6 +31,7 @@ export async function createShortUrl(originalUrl, expiresAt, customAlias) {
         originalUrl,
         expiresAt: expiresAt ?? null,
         shortCode: customAlias,
+        userId,
       },
     });
 
@@ -32,6 +42,7 @@ export async function createShortUrl(originalUrl, expiresAt, customAlias) {
     data: {
       originalUrl,
       expiresAt: expiresAt ?? null,
+      userId,
     },
   });
 
@@ -63,7 +74,7 @@ export async function findOriginalUrl(code) {
   };
 }
 
-export async function getUrlStats(code) {
+export async function getUrlStatsForOwner(code, userId) {
   const urlEntry = await prisma.url.findUnique({
     where: { shortCode: code },
     select: {
@@ -72,6 +83,7 @@ export async function getUrlStats(code) {
       expiresAt: true,
       clickCount: true,
       createdAt: true,
+      userId: true,
     },
   });
 
@@ -79,7 +91,34 @@ export async function getUrlStats(code) {
     throw new AppError("URL not found", 404);
   }
 
-  return urlEntry;
+  if (!urlEntry.userId) {
+    throw new AppError(
+      "This link has no owner, so stats are private and unavailable",
+      403
+    );
+  }
+
+  if (urlEntry.userId !== userId) {
+    throw new AppError("You can only view stats for links you created", 403);
+  }
+
+  const { userId: _ownerId, ...stats } = urlEntry;
+  return stats;
+}
+
+export async function listUrlsForUser(userId) {
+  const urls = await prisma.url.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      shortCode: true,
+      originalUrl: true,
+      expiresAt: true,
+      clickCount: true,
+      createdAt: true,
+    },
+  });
+  return urls;
 }
 
 function buildClickEvent(shortCode, clickedAt = new Date()) {
@@ -109,7 +148,6 @@ export function enqueueClickEvent(shortCode) {
     return;
   }
 
-  // No Redis (or worker) available — still record the click without blocking.
   persistInBackground(payload);
 }
 
@@ -135,8 +173,6 @@ export async function persistClickEvent(rawPayload) {
   const clickedAt = new Date(evt.clickedAt);
   const shortCode = evt.shortCode;
 
-  // At-least-once semantics: worker may retry and create duplicates in ClickEvent.
-  // For this learning project, we keep the logic simple and resilient.
   await prisma.$transaction(async (tx) => {
     await tx.clickEvent.create({
       data: {
@@ -156,10 +192,6 @@ export async function persistClickEvent(rawPayload) {
 
 export async function requeueProcessingItem(rawPayload) {
   if (!redisClient?.isReady) return;
-  await redisClient
-    .rPush(CLICK_QUEUE_KEY, rawPayload)
-    .catch(() => {});
-  await redisClient
-    .lRem(CLICK_PROCESSING_KEY, 0, rawPayload)
-    .catch(() => {});
+  await redisClient.rPush(CLICK_QUEUE_KEY, rawPayload).catch(() => {});
+  await redisClient.lRem(CLICK_PROCESSING_KEY, 0, rawPayload).catch(() => {});
 }
