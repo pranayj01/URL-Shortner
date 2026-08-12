@@ -7,10 +7,12 @@ import {
 import redisClient from "../config/redis.js";
 
 function buildShortUrl(shortCode) {
-  const base = (process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`).replace(
-    /\/$/,
-    ""
-  );
+  // Prefer explicit BASE_URL, then Render's public URL, then localhost for local dev.
+  const base = (
+    process.env.BASE_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    `http://localhost:${process.env.PORT || 3000}`
+  ).replace(/\/$/, "");
   return `${base}/${shortCode}`;
 }
 
