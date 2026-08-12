@@ -1,7 +1,10 @@
-export function errorHandler(error, req, res, next){
+import { AppError } from "../utils/AppError.js";
 
-    res.status(500).json({
-        message:error.message
-    });
+export function errorHandler(error, req, res, next) {
+  const statusCode =
+    error instanceof AppError ? error.statusCode : error.statusCode || 500;
 
+  res.status(statusCode).json({
+    message: error.message || "Internal server error",
+  });
 }

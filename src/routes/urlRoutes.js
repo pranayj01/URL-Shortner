@@ -1,19 +1,19 @@
 import express from "express";
-import { shortenUrl , redirectUrl } from "../controllers/urlController.js";
+import {
+  shortenUrl,
+  redirectUrl,
+  urlStats,
+} from "../controllers/urlController.js";
 import { validateUrl } from "../middleware/validateUrl.js";
-import redisClient from "../config/redis.js";
-const router = express.Router();
+import { rateLimit } from "../middleware/rateLimit.js";
 
-router.get("/shorten", (req, res) => {
-  res.json({ message: "shorten endpoint working" });
-});
+export const apiRouter = express.Router();
+// Rate limit before any DB work on API routes (not keyed by URL path).
+apiRouter.use(rateLimit);
+apiRouter.post("/shorten", validateUrl, shortenUrl);
+apiRouter.get("/urls/:code", urlStats);
 
-router.post("/shorten",validateUrl, shortenUrl);
-router.get("/:code", redirectUrl);
-router.get("/redis-test", async (req, res) => {
-  await redisClient.set("test", "hello");
-  const value = await redisClient.get("test");
-
-  res.json({ value });
-});
-export default router;
+export const redirectRouter = express.Router();
+// Rate limit before Redis cache / PostgreSQL on redirects.
+redirectRouter.use(rateLimit);
+redirectRouter.get("/:code", redirectUrl);

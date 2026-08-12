@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shortlink</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="bg" aria-hidden="true"></div>
+    <main class="shell">
+      <header class="brand">
+        <p class="brand-mark">Shortlink</p>
+        <p class="tagline">Shorten a URL. Share it. Track the clicks.</p>
+      </header>
+
+      <section class="panel" aria-labelledby="shorten-heading">
+        <h1 id="shorten-heading" class="visually-hidden">Create a short link</h1>
+        <form id="shorten-form" autocomplete="off">
+          <label class="field">
+            <span>Long URL</span>
+            <input
+              id="originalUrl"
+              name="originalUrl"
+              type="text"
+              placeholder="example.com/very/long/path"
+              required
+            />
+          </label>
+
+          <div class="row">
+            <label class="field">
+              <span>Custom alias <em>(optional)</em></span>
+              <input
+                id="customAlias"
+                name="customAlias"
+                type="text"
+                placeholder="my-link"
+                maxlength="32"
+                pattern="[a-zA-Z0-9_-]{3,32}"
+              />
+            </label>
+            <label class="field">
+              <span>Expires <em>(optional)</em></span>
+              <input id="expiresAt" name="expiresAt" type="datetime-local" />
+            </label>
+          </div>
+
+          <button type="submit" id="submit-btn">Shorten</button>
+          <p id="form-error" class="error" hidden></p>
+        </form>
+
+        <div id="result" class="result" hidden>
+          <p class="result-label">Your short link</p>
+          <div class="result-row">
+            <a id="short-url" href="#" target="_blank" rel="noopener"></a>
+            <button type="button" id="copy-btn" class="ghost">Copy</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel stats-panel" aria-labelledby="stats-heading">
+        <h2 id="stats-heading">Look up stats</h2>
+        <form id="stats-form" class="stats-form" autocomplete="off">
+          <label class="field grow">
+            <span>Short code</span>
+            <input id="statsCode" name="statsCode" type="text" placeholder="abc12" required />
+          </label>
+          <button type="submit" class="ghost">Fetch</button>
+        </form>
+        <p id="stats-error" class="error" hidden></p>
+        <dl id="stats-result" class="stats" hidden></dl>
+      </section>
+    </main>
+    <script src="/assets/app.js" type="module"></script>
+  </body>
+</html>

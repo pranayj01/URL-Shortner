@@ -2,10 +2,11 @@
   "name": "url-shortner",
   "version": "1.0.0",
   "description": "",
-  "main": "backend/src/server.js",
+  "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "benchmark:redirect": "node scripts/benchmark-redirect.mjs"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,9 @@
     "redis": "^6.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "autocannon": "^8.0.0",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "nodemon": "^3.1.14",
+    "redis-memory-server": "^0.17.1"
   }
 }

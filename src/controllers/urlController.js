@@ -1,11 +1,27 @@
-import { createShortUrl, findOriginalUrl } from "../services/urlService.js";
+import {
+  createShortUrl,
+  findOriginalUrl,
+  getUrlStats,
+  recordClick,
+} from "../services/urlService.js";
 import redisClient from "../config/redis.js";
+
+function buildShortUrl(shortCode) {
+  const base = (process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`).replace(
+    /\/$/,
+    ""
+  );
+  return `${base}/${shortCode}`;
+}
 
 export async function shortenUrl(req, res, next) {
   try {
     const { originalUrl, expiresAt, customAlias } = req.body;
     const result = await createShortUrl(originalUrl, expiresAt, customAlias);
-    res.status(201).json(result);
+    res.status(201).json({
+      shortCode: result.shortCode,
+      shortUrl: buildShortUrl(result.shortCode),
+    });
   } catch (error) {
     next(error);
   }
@@ -22,12 +38,12 @@ export async function redirectUrl(req, res, next) {
       if (redisClient?.isReady) {
         cachedUrl = await redisClient.get(key);
       }
-    } catch (err) {
+    } catch {
       console.error("Redis unavailable");
     }
 
     if (cachedUrl) {
-      
+      recordClick(code);
       return res.redirect(cachedUrl);
     }
 
@@ -39,12 +55,9 @@ export async function redirectUrl(req, res, next) {
 
     const { originalUrl, expiresAt } = urlData;
 
-  
-
     try {
       if (redisClient?.isReady) {
         if (expiresAt) {
-          
           const ttlSeconds = Math.floor(
             (new Date(expiresAt) - new Date()) / 1000
           );
@@ -56,13 +69,25 @@ export async function redirectUrl(req, res, next) {
           await redisClient.set(key, originalUrl);
         }
       }
-    } catch (err) {
+    } catch {
       console.error("Redis unavailable");
     }
 
-    
-    
+    recordClick(code);
     return res.redirect(originalUrl);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function urlStats(req, res, next) {
+  try {
+    const { code } = req.params;
+    const stats = await getUrlStats(code);
+    res.json({
+      ...stats,
+      shortUrl: buildShortUrl(stats.shortCode),
+    });
   } catch (error) {
     next(error);
   }
