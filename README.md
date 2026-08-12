@@ -21,11 +21,7 @@ docker compose up --build
 
 Open http://localhost:3000
 
-Start the analytics worker in a separate terminal:
-
-```bash
-npm run worker:clicks
-```
+`npm start` / Docker start the API and the click-analytics worker together.
 
 ## Local development
 
@@ -40,6 +36,8 @@ npm run worker:clicks
    npx prisma migrate deploy
    npm run dev
    ```
+
+   `npm run dev` also starts the click worker. To run it alone: `npm run worker:clicks`
 
 ## API
 
@@ -104,6 +102,19 @@ npm run benchmark:redirect
 | Requests/sec | 1553.8 | 3096 |
 
 Environment: Windows 11, Node 22, embedded PostgreSQL 18 + Memurai (via `redis-memory-server`), August 12, 2026.
+
+## Render deploy (P1001)
+
+`Can't reach database server at dpg-...-a:5432` means Prisma got Render's **internal** hostname (no domain). That host only works on Render's private network, and Prisma often cannot resolve a hostname with no dot.
+
+In the Render dashboard, set `DATABASE_URL` to the Postgres **External** connection string (host ends with `.oregon-postgres.render.com` or similar). Do not use the Internal URL unless the web service is in the same Render region and you append `.internal` to the host.
+
+Also set:
+
+- `REDIS_URL` if you use Redis (otherwise clicks still persist directly to Postgres)
+- `NODE_ENV=production`
+
+Redeploy after changing env vars. Never commit the connection string.
 
 ## Intentionally deferred
 

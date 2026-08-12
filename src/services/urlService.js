@@ -89,18 +89,28 @@ function buildClickEvent(shortCode, clickedAt = new Date()) {
   };
 }
 
-// Producer: must not block redirect path.
+function persistInBackground(payload) {
+  persistClickEvent(payload).catch((err) => {
+    console.error("Failed to persist click:", err.message);
+  });
+}
+
+// Producer: must not block the redirect path.
 export function enqueueClickEvent(shortCode) {
-  if (!redisClient?.isReady) return;
   if (!shortCode || typeof shortCode !== "string") return;
 
-  const event = buildClickEvent(shortCode);
-  const payload = JSON.stringify(event);
+  const payload = JSON.stringify(buildClickEvent(shortCode));
 
-  // Fire-and-forget. If Redis is unavailable, analytics will lag (redirect remains fast).
-  redisClient
-    .rPush(CLICK_QUEUE_KEY, payload)
-    .catch((err) => console.error("Failed to enqueue click:", err.message));
+  if (redisClient?.isReady) {
+    redisClient.rPush(CLICK_QUEUE_KEY, payload).catch((err) => {
+      console.error("Failed to enqueue click:", err.message);
+      persistInBackground(payload);
+    });
+    return;
+  }
+
+  // No Redis (or worker) available — still record the click without blocking.
+  persistInBackground(payload);
 }
 
 function isValidEvent(evt) {

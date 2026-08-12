@@ -10,6 +10,9 @@ RUN npx prisma generate
 
 COPY . .
 
+ENV NODE_ENV=production
+ENV RUN_MIGRATIONS=true
+
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]
+CMD ["node", "src/start.js"]

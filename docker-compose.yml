@@ -32,6 +32,8 @@ services:
     ports:
       - "3000:3000"
     environment:
+      NODE_ENV: production
+      RUN_MIGRATIONS: "true"
       PORT: 3000
       BASE_URL: http://localhost:3000
       DATABASE_URL: postgresql://postgres:password@postgres:5432/mydb
