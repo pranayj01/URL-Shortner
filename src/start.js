@@ -15,17 +15,16 @@ const runMigrations =
   process.env.RUN_MIGRATIONS === "true" ||
   process.env.NODE_ENV === "production";
 
-function spawnNode(label, scriptPath, extraEnv = {}) {
+function spawnNode(label, scriptPath, extraEnv = {}, { fatal = true } = {}) {
   const child = spawn(process.execPath, [scriptPath], {
     stdio: "inherit",
     env: { ...process.env, ...extraEnv },
   });
 
   child.on("exit", (code, signal) => {
-    if (!shuttingDown) {
-      console.error(`${label} exited (code=${code}, signal=${signal})`);
-      shutdown(code || 1);
-    }
+    if (shuttingDown) return;
+    console.error(`${label} exited (code=${code}, signal=${signal})`);
+    if (fatal) shutdown(code || 1);
   });
 
   return child;
@@ -65,4 +64,9 @@ if (runMigrations) {
 }
 
 children.push(spawnNode("server", "src/server.js", { START_WORKER: "false" }));
-children.push(spawnNode("click-worker", "src/workers/clickWorker.js"));
+
+if (process.env.REDIS_URL) {
+  children.push(spawnNode("click-worker", "src/workers/clickWorker.js", {}, { fatal: false }));
+} else {
+  console.log("REDIS_URL not set; skipping click worker. Clicks still save to Postgres.");
+}

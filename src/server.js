@@ -10,7 +10,7 @@ app.listen(PORT, () => {
 });
 
 // If someone starts `node src/server.js` (common Render override), still run analytics.
-if (process.env.START_WORKER !== "false") {
+if (process.env.START_WORKER !== "false" && process.env.REDIS_URL) {
   const worker = spawn(process.execPath, ["src/workers/clickWorker.js"], {
     stdio: "inherit",
     env: { ...process.env, START_WORKER: "false" },

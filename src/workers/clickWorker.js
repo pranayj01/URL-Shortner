@@ -64,8 +64,7 @@ async function main() {
   );
 
   if (!redisClient) {
-    console.log("REDIS_URL is not set; click worker idle.");
-    await new Promise(() => {});
+    console.log("REDIS_URL is not set; click worker not needed.");
     return;
   }
 
