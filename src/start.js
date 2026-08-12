@@ -8,10 +8,10 @@ const runMigrations =
   process.env.RUN_MIGRATIONS === "true" ||
   process.env.NODE_ENV === "production";
 
-function spawnNode(label, scriptPath) {
+function spawnNode(label, scriptPath, extraEnv = {}) {
   const child = spawn(process.execPath, [scriptPath], {
     stdio: "inherit",
-    env: process.env,
+    env: { ...process.env, ...extraEnv },
   });
 
   child.on("exit", (code, signal) => {
@@ -57,5 +57,12 @@ if (runMigrations) {
   await runMigrate();
 }
 
-children.push(spawnNode("server", "src/server.js"));
+try {
+  const host = new URL(process.env.DATABASE_URL).hostname;
+  console.log(`Using database host: ${host}`);
+} catch {
+  console.log("DATABASE_URL is missing or invalid");
+}
+
+children.push(spawnNode("server", "src/server.js", { START_WORKER: "false" }));
 children.push(spawnNode("click-worker", "src/workers/clickWorker.js"));

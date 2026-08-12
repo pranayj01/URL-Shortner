@@ -103,18 +103,27 @@ npm run benchmark:redirect
 
 Environment: Windows 11, Node 22, embedded PostgreSQL 18 + Memurai (via `redis-memory-server`), August 12, 2026.
 
-## Render deploy (P1001)
+## Fix Render deploy (do this in the dashboard)
 
-`Can't reach database server at dpg-...-a:5432` means Prisma got Render's **internal** hostname (no domain). That host only works on Render's private network, and Prisma often cannot resolve a hostname with no dot.
+The code cannot log into your Render account. These env/start settings are what actually unblock P1001 and analytics.
 
-In the Render dashboard, set `DATABASE_URL` to the Postgres **External** connection string (host ends with `.oregon-postgres.render.com` or similar). Do not use the Internal URL unless the web service is in the same Render region and you append `.internal` to the host.
+1. Open the **Postgres** service → **Info** → **Connections**.
+2. Copy **External Database URL** (host must look like `dpg-….oregon-postgres.render.com`).
+   - Do **not** use Internal Database URL (`dpg-….` with no `.render.com`). That is what caused `P1001`.
+3. Open the **Web** service → **Environment**.
+   - Set `DATABASE_URL` = that External URL.
+   - Set `NODE_ENV` = `production`.
+   - Optional: `REDIS_URL` if you have a Render Redis instance. Analytics still works without Redis.
+4. Web service **Settings**:
+   - If this is a **Docker** deploy: leave Start Command empty (the Dockerfile already runs `node src/start.js`).
+   - If this is a **Node** deploy:
+     - Build Command: `npm install && npx prisma generate`
+     - Start Command: `npm start`
+   - Do **not** run `prisma migrate deploy` in the **Build** command. Render’s build network cannot reach the database.
+5. **Manual Deploy** → **Deploy latest commit**.
+6. In logs you should see `Using database host: …render.com` then `Server running on port …` and `Click worker starting`.
 
-Also set:
-
-- `REDIS_URL` if you use Redis (otherwise clicks still persist directly to Postgres)
-- `NODE_ENV=production`
-
-Redeploy after changing env vars. Never commit the connection string.
+If it still fails, the database may be paused or the password was rotated — copy a fresh External URL from the Postgres page.
 
 ## Intentionally deferred
 
