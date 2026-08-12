@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/start.js",
     "start": "node src/start.js",
+    "build": "npx prisma generate",
     "worker:clicks": "node src/workers/clickWorker.js",
     "benchmark:redirect": "node scripts/benchmark-redirect.mjs"
   },
