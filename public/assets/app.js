@@ -14,6 +14,30 @@ function showError(el, message) {
   el.textContent = message || "";
 }
 
+/** Accept either a short code ("abc12") or a full short URL. */
+function extractShortCode(input) {
+  const value = (input || "").trim();
+  if (!value) return "";
+
+  try {
+    if (value.includes("://") || value.startsWith("//")) {
+      const url = new URL(value.startsWith("//") ? `https:${value}` : value);
+      const parts = url.pathname.split("/").filter(Boolean);
+      return parts[parts.length - 1] || "";
+    }
+  } catch {
+    // Fall through and treat the raw text as a code.
+  }
+
+  // "onrender.com/abc12" or "/abc12"
+  const slashParts = value.split("/").filter(Boolean);
+  if (slashParts.length > 1) {
+    return slashParts[slashParts.length - 1];
+  }
+
+  return value;
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   showError(formError, "");
@@ -74,14 +98,24 @@ statsForm.addEventListener("submit", async (event) => {
   statsResult.hidden = true;
   statsResult.innerHTML = "";
 
-  const code = document.getElementById("statsCode").value.trim();
+  const code = extractShortCode(document.getElementById("statsCode").value);
+
+  if (!code) {
+    showError(statsError, "Enter a short code (e.g. abc12) or paste your short link.");
+    return;
+  }
 
   try {
     const res = await fetch(`/api/urls/${encodeURIComponent(code)}`);
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      throw new Error(data.message || "Could not load stats");
+      throw new Error(
+        data.message ||
+          (res.status === 404
+            ? "Short code not found. Use only the code after the last /"
+            : "Could not load stats")
+      );
     }
 
     const rows = [

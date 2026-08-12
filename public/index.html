@@ -69,8 +69,14 @@
         <h2 id="stats-heading">Look up stats</h2>
         <form id="stats-form" class="stats-form" autocomplete="off">
           <label class="field grow">
-            <span>Short code</span>
-            <input id="statsCode" name="statsCode" type="text" placeholder="abc12" required />
+            <span>Short code or short link</span>
+            <input
+              id="statsCode"
+              name="statsCode"
+              type="text"
+              placeholder="abc12 or https://your-app.onrender.com/abc12"
+              required
+            />
           </label>
           <button type="submit" class="ghost">Fetch</button>
         </form>

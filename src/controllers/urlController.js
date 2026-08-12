@@ -86,7 +86,14 @@ export async function redirectUrl(req, res, next) {
 
 export async function urlStats(req, res, next) {
   try {
-    const { code } = req.params;
+    let { code } = req.params;
+
+    // If someone pasted a full short URL into the path somehow, keep the last segment.
+    if (code.includes("/")) {
+      const parts = code.split("/").filter(Boolean);
+      code = parts[parts.length - 1];
+    }
+
     const stats = await getUrlStats(code);
     res.json({
       ...stats,
