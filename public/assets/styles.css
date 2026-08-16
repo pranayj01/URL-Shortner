@@ -431,6 +431,10 @@ select {
   text-decoration: none;
 }
 
+.clicks-table code {
+  font-size: 0.82rem;
+}
+
 .badge {
   display: inline-block;
   font-size: 0.75rem;

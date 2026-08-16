@@ -13,7 +13,7 @@ A learning-focused URL shortener built with Express, PostgreSQL (Prisma), and Re
 - Health check for Postgres + Redis
 - Simple UI to create, search, edit, and inspect links
 - QR codes, optional link passwords, and disable/archive
-- Click analytics (country, device, browser, referrer, UTM, daily counts)
+- Click analytics (open time, IP, country, device, browser, referrer, UTM, daily counts)
 
 ## Quick start (Docker)
 

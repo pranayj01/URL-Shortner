@@ -219,6 +219,42 @@ function barChart(title, rows) {
   return `<section class="chart-block"><h4>${title}</h4>${items}</section>`;
 }
 
+function recentClicksTable(rows) {
+  if (!rows?.length) {
+    return `<section class="chart-block"><h4>Recent opens</h4><p class="hint">No clicks in this range yet.</p></section>`;
+  }
+  const body = rows
+    .map(
+      (row) => `<tr>
+        <td>${new Date(row.clickedAt).toLocaleString()}</td>
+        <td><code>${row.ipAddress}</code></td>
+        <td>${row.country}</td>
+        <td>${row.device}</td>
+        <td>${row.browser}</td>
+        <td>${row.referrer}</td>
+      </tr>`
+    )
+    .join("");
+  return `<section class="chart-block">
+    <h4>Recent opens</h4>
+    <div class="table-wrap">
+      <table class="links-table clicks-table">
+        <thead>
+          <tr>
+            <th>Opened at</th>
+            <th>IP</th>
+            <th>Country</th>
+            <th>Device</th>
+            <th>Browser</th>
+            <th>Referrer</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+  </section>`;
+}
+
 async function loadStats(code) {
   showError(statsError, "");
   selectedCode = code;
@@ -248,6 +284,7 @@ async function loadStats(code) {
     }
     document.getElementById("stats-detail-title").textContent = data.shortCode;
     chartsEl.innerHTML =
+      recentClicksTable(analytics.recentClicks) +
       barChart(
         "Clicks by day",
         analytics.timeseries.map((r) => ({ name: r.day, count: r.count }))
@@ -387,9 +424,20 @@ copyBtn.addEventListener("click", async () => {
   }
 });
 
-refreshMineBtn.addEventListener("click", () => {
+refreshMineBtn.addEventListener("click", async () => {
   if (!currentUser) return;
-  loadMyLinks();
+  refreshMineBtn.disabled = true;
+  const label = refreshMineBtn.textContent;
+  refreshMineBtn.textContent = "Refreshing…";
+  try {
+    await loadMyLinks();
+    if (selectedCode && !statsDetail.hidden) {
+      await loadStats(selectedCode);
+    }
+  } finally {
+    refreshMineBtn.disabled = false;
+    refreshMineBtn.textContent = label || "Refresh";
+  }
 });
 
 mineSearch.addEventListener("input", () => {
@@ -415,6 +463,20 @@ minePrev.addEventListener("click", () => {
 mineNext.addEventListener("click", () => {
   minePage += 1;
   loadMyLinks();
+});
+
+document.getElementById("refresh-stats-btn").addEventListener("click", async () => {
+  if (!selectedCode) return;
+  const btn = document.getElementById("refresh-stats-btn");
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = "Refreshing…";
+  try {
+    await loadStats(selectedCode);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label || "Refresh stats";
+  }
 });
 
 document.getElementById("edit-link-btn").addEventListener("click", () => {

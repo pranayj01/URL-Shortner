@@ -153,6 +153,7 @@ describe("phase 1 API", () => {
     await persistClickEvent({
       shortCode: alias,
       clickedAt: new Date().toISOString(),
+      ipAddress: "198.51.100.20",
       country: "US",
       device: "desktop",
       browser: "chrome",
@@ -168,6 +169,11 @@ describe("phase 1 API", () => {
     const { data: analytics } = await json(`/api/urls/${alias}/analytics`);
     assert.ok(analytics.countries.some((row) => row.name === "US"));
     assert.ok(analytics.utmSources.some((row) => row.name === "twitter"));
+    assert.ok(
+      analytics.recentClicks.some(
+        (row) => row.ipAddress === "198.51.100.20" && row.clickedAt
+      )
+    );
 
     const qrRes = await fetch(`${base}/${alias}/qr.png`);
     assert.equal(qrRes.status, 200);

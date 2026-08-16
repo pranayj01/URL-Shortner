@@ -17,6 +17,21 @@ function queryValue(req, key) {
   return null;
 }
 
+function normalizeIp(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  let ip = raw.trim();
+  if (ip.includes(",")) ip = ip.split(",")[0].trim();
+  if (ip.startsWith("::ffff:")) ip = ip.slice(7);
+  if (!ip || ip === "unknown") return null;
+  return ip.slice(0, 64);
+}
+
+export function clientIp(req) {
+  const forwarded = firstHeader(req, ["x-forwarded-for", "x-real-ip", "cf-connecting-ip"]);
+  if (forwarded) return normalizeIp(forwarded);
+  return normalizeIp(req.ip || req.socket?.remoteAddress || "");
+}
+
 export function extractClickMeta(req) {
   const country = firstHeader(req, [
     "cf-ipcountry",
@@ -24,7 +39,9 @@ export function extractClickMeta(req) {
     "cloudfront-viewer-country",
     "x-country-code",
   ]);
-  const { device, browser } = parseUserAgent(req.get?.("user-agent") || req.headers["user-agent"]);
+  const { device, browser } = parseUserAgent(
+    req.get?.("user-agent") || req.headers["user-agent"]
+  );
   const referer = req.get?.("referer") || req.headers.referer;
   let referrer = null;
   if (typeof referer === "string" && referer) {
@@ -36,6 +53,7 @@ export function extractClickMeta(req) {
   }
 
   return {
+    ipAddress: clientIp(req),
     country: country ? country.toUpperCase().slice(0, 8) : null,
     device,
     browser,

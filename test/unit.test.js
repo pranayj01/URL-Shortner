@@ -18,10 +18,11 @@ describe("parseUserAgent", () => {
 });
 
 describe("extractClickMeta", () => {
-  it("reads country, UTMs, and referrer host", () => {
+  it("reads country, UTMs, referrer host, and IP", () => {
     const meta = extractClickMeta({
       headers: {
         "cf-ipcountry": "in",
+        "x-forwarded-for": "203.0.113.10, 10.0.0.1",
         "user-agent": "Mozilla/5.0 Firefox/121.0",
         referer: "https://news.example.com/path",
       },
@@ -33,6 +34,7 @@ describe("extractClickMeta", () => {
       },
     });
     assert.equal(meta.country, "IN");
+    assert.equal(meta.ipAddress, "203.0.113.10");
     assert.equal(meta.browser, "firefox");
     assert.equal(meta.referrer, "news.example.com");
     assert.equal(meta.utmSource, "twitter");

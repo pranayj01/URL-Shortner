@@ -333,7 +333,7 @@ export async function getAnalyticsForOwner(code, userId, { from, to } = {}) {
     clickedAt: { gte: fromDate, lte: toDate },
   };
 
-  const [byCountry, byDevice, byBrowser, byReferrer, byUtmSource, timeseries] =
+  const [byCountry, byDevice, byBrowser, byReferrer, byUtmSource, timeseries, recent] =
     await Promise.all([
       prisma.clickEvent.groupBy({
         by: ["country"],
@@ -378,6 +378,20 @@ export async function getAnalyticsForOwner(code, userId, { from, to } = {}) {
         GROUP BY 1
         ORDER BY 1
       `,
+      prisma.clickEvent.findMany({
+        where,
+        orderBy: { clickedAt: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          clickedAt: true,
+          ipAddress: true,
+          country: true,
+          device: true,
+          browser: true,
+          referrer: true,
+        },
+      }),
     ]);
 
   return {
@@ -392,6 +406,15 @@ export async function getAnalyticsForOwner(code, userId, { from, to } = {}) {
     browsers: groupRows(byBrowser, "browser"),
     referrers: groupRows(byReferrer, "referrer"),
     utmSources: groupRows(byUtmSource, "utmSource"),
+    recentClicks: recent.map((row) => ({
+      id: row.id,
+      clickedAt: row.clickedAt.toISOString(),
+      ipAddress: row.ipAddress || "Unknown",
+      country: row.country || "Unknown",
+      device: row.device || "Unknown",
+      browser: row.browser || "Unknown",
+      referrer: row.referrer || "Direct",
+    })),
   };
 }
 
@@ -399,6 +422,7 @@ function buildClickEvent(shortCode, clickedAt = new Date(), meta = {}) {
   return {
     shortCode,
     clickedAt: clickedAt.toISOString(),
+    ipAddress: meta.ipAddress ?? null,
     country: meta.country ?? null,
     device: meta.device ?? null,
     browser: meta.browser ?? null,
@@ -464,6 +488,7 @@ export async function persistClickEvent(rawPayload) {
         shortCode,
         clickedAt,
         urlId: url.id,
+        ipAddress: evt.ipAddress ?? null,
         country: evt.country ?? null,
         device: evt.device ?? null,
         browser: evt.browser ?? null,

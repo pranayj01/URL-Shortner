@@ -97,6 +97,7 @@ model ClickEvent {
   shortCode   String
   clickedAt   DateTime
   createdAt   DateTime @default(now())
+  ipAddress   String?
   country     String?
   device      String?
   browser     String?
