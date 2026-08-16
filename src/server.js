@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./config/loadEnv.js";
 import { spawn } from "node:child_process";
 import app from "./app.js";
 import "./config/redis.js";

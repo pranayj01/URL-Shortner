@@ -1,9 +1,15 @@
-const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60_000;
-const MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX) || 100;
+function windowMs() {
+  return Number(process.env.RATE_LIMIT_WINDOW_MS) || 60_000;
+}
+
+function maxRequests() {
+  return Number(process.env.RATE_LIMIT_MAX) || 100;
+}
 
 const hits = new Map();
 
 function prune(now) {
+  const WINDOW_MS = windowMs();
   for (const [key, entry] of hits) {
     if (now - entry.windowStart >= WINDOW_MS) {
       hits.delete(key);
@@ -26,13 +32,14 @@ export function rateLimit(req, res, next) {
   const key = clientIp(req);
   let entry = hits.get(key);
 
-  if (!entry || now - entry.windowStart >= WINDOW_MS) {
+  if (!entry || now - entry.windowStart >= windowMs()) {
     entry = { windowStart: now, count: 0 };
     hits.set(key, entry);
   }
 
   entry.count += 1;
 
+  const MAX_REQUESTS = maxRequests();
   const remaining = Math.max(0, MAX_REQUESTS - entry.count);
   res.setHeader("X-RateLimit-Limit", String(MAX_REQUESTS));
   res.setHeader("X-RateLimit-Remaining", String(remaining));

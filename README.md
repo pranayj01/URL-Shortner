@@ -4,15 +4,16 @@ A learning-focused URL shortener built with Express, PostgreSQL (Prisma), and Re
 
 ## What it includes
 
-- Create short links (Base62 from DB id or custom alias)
+- Create short links as a guest or while logged in (Base62 from DB id or custom alias)
 - Optional expiry
 - Redirect with Redis read-through cache (public — no login)
-- Login/register so only the creator can view link insights
+- Login/register so only the creator can view link insights (Better Auth sessions)
 - Click counting (async, non-blocking via Redis queue + worker)
 - IP-based rate limiting before cache/database access
 - Health check for Postgres + Redis
-- Simple UI to create links and look up stats
-- `User` model stub for future auth (links stay anonymous for now)
+- Simple UI to create, search, edit, and inspect links
+- QR codes, optional link passwords, and disable/archive
+- Click analytics (country, device, browser, referrer, UTM, daily counts)
 
 ## Quick start (Docker)
 
@@ -44,13 +45,20 @@ Open http://localhost:3000
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/auth/register` | Create account `{ email, password }` |
-| `POST` | `/api/auth/login` | Login → `{ token, user }` |
-| `GET` | `/api/auth/me` | Current user (Bearer token) |
-| `POST` | `/api/shorten` | Create short URL (login required) |
-| `GET` | `/api/urls/mine` | List your links (login required) |
-| `GET` | `/api/urls/:code` | Stats for a link you own (login required) |
-| `GET` | `/:code` | Redirect to original URL (public) |
+| `POST` | `/api/auth/sign-up/email` | Create account `{ email, password, name }` (Better Auth) |
+| `POST` | `/api/auth/sign-in/email` | Login (sets session cookie) |
+| `POST` | `/api/auth/sign-out` | Log out |
+| `GET` | `/api/auth/get-session` | Current session `{ user, session }` or empty |
+| `GET` | `/api/me` | Current user (session cookie required) |
+| `POST` | `/api/shorten` | Create short URL (public; attaches owner if logged in). Optional `password`, `disabled` when authenticated |
+| `GET` | `/api/urls/mine` | List your links (`q`, `sort`, `order`, `page`, `limit`) |
+| `GET` | `/api/urls/:code` | Stats for a link you own |
+| `PATCH` | `/api/urls/:code` | Edit destination, alias, expiry, password, disabled |
+| `DELETE` | `/api/urls/:code` | Delete a link you own |
+| `GET` | `/api/urls/:code/analytics` | Click breakdown (country, device, referrer, UTM, timeseries) |
+| `GET` | `/api/urls/:code/qr` | PNG QR (owner) |
+| `GET` | `/:code` | Redirect (public). Password links show a gate; `POST` with `password` to unlock |
+| `GET` | `/:code/qr.png` | Public PNG QR of the short URL |
 | `GET` | `/health` | Liveness + dependency status |
 
 ### Example
@@ -138,9 +146,10 @@ No special code changes are required. Create **3 services** in the same region, 
 |-----|--------|
 | `DATABASE_URL` | Postgres **External** URL from step 1 |
 | `REDIS_URL` | Redis URL from step 2 |
+| `BETTER_AUTH_URL` | Same as site URL, e.g. `https://your-app.onrender.com` |
+| `BETTER_AUTH_SECRET` | A long random string (session signing) |
 | `BASE_URL` | Your site URL, e.g. `https://your-app.onrender.com` |
 | `NODE_ENV` | `production` |
-| `JWT_SECRET` | A long random string (login tokens) |
 
 4. Deploy
 5. Open the public URL Render gives you
@@ -161,9 +170,8 @@ No special code changes are required. Create **3 services** in the same region, 
 
 ## Intentionally deferred
 
-- OAuth / social login
-- Automated tests
-- Custom domains / QR codes
+- OAuth / social login (Better Auth supports adding providers later)
+- Custom domains
 
 ## Security note
 

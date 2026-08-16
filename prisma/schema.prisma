@@ -12,31 +12,100 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
-  urls         Url[]
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  urls          Url[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
 }
 
 model Url {
-  id          Int       @id @default(autoincrement())
-  originalUrl String
-  shortCode   String?   @unique
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  expiresAt   DateTime?
-  clickCount  Int       @default(0)
-  userId      Int?
-  user        User?     @relation(fields: [userId], references: [id])
+  id           Int          @id @default(autoincrement())
+  originalUrl  String
+  shortCode    String?      @unique
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  expiresAt    DateTime?
+  clickCount   Int          @default(0)
+  disabled     Boolean      @default(false)
+  passwordHash String?
+  userId       String?
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  clickEvents  ClickEvent[]
+
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model ClickEvent {
-  id         Int      @id @default(autoincrement())
-  shortCode  String
-  clickedAt  DateTime
-  createdAt  DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  shortCode   String
+  clickedAt   DateTime
+  createdAt   DateTime @default(now())
+  country     String?
+  device      String?
+  browser     String?
+  referrer    String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  urlId       Int?
+  url         Url?     @relation(fields: [urlId], references: [id], onDelete: Cascade)
 
-  @@index([shortCode])
-  @@index([clickedAt])
+  @@index([shortCode, clickedAt])
 }

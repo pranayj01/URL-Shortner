@@ -7,6 +7,7 @@
     "dev": "nodemon src/start.js",
     "start": "node src/start.js",
     "build": "npx prisma generate",
+    "test": "node --import ./test/preload.js --test test/unit.test.js test/api.test.js",
     "worker:clicks": "node src/workers/clickWorker.js",
     "benchmark:redirect": "node scripts/benchmark-redirect.mjs"
   },
@@ -17,16 +18,16 @@
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
+    "better-auth": "^1.6.29",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
     "prisma": "^6.19.3",
+    "qrcode": "^1.5.4",
     "redis": "^6.0.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.10",
     "autocannon": "^8.0.0",
     "embedded-postgres": "^18.4.0-beta.17",
     "nodemon": "^3.1.14",

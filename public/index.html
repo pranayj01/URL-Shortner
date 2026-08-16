@@ -25,30 +25,11 @@
         </div>
       </header>
 
-      <section class="panel" id="auth-panel" aria-labelledby="auth-heading">
-        <h2 id="auth-heading">Account</h2>
-        <p class="hint">
-          Anyone can open a short link. Login is required to create links and view your insights.
-        </p>
-        <form id="auth-form" autocomplete="on">
-          <label class="field">
-            <span>Email</span>
-            <input id="authEmail" name="email" type="email" required placeholder="you@example.com" />
-          </label>
-          <label class="field">
-            <span>Password</span>
-            <input id="authPassword" name="password" type="password" required minlength="6" placeholder="At least 6 characters" />
-          </label>
-          <div class="auth-actions">
-            <button type="submit" id="login-btn">Log in</button>
-            <button type="button" id="register-btn" class="ghost">Create account</button>
-          </div>
-          <p id="auth-error" class="error" hidden></p>
-        </form>
-      </section>
-
       <section class="panel" aria-labelledby="shorten-heading">
         <h1 id="shorten-heading" class="visually-hidden">Create a short link</h1>
+        <p class="hint" id="shorten-hint">
+          Anyone can create a short link. Log in to save links to your account and view insights.
+        </p>
         <form id="shorten-form" autocomplete="off">
           <label class="field">
             <span>Long URL</span>
@@ -79,6 +60,17 @@
             </label>
           </div>
 
+          <div class="row owner-only" hidden>
+            <label class="field">
+              <span>Link password <em>(optional)</em></span>
+              <input id="linkPassword" name="password" type="password" placeholder="Leave blank for public" />
+            </label>
+            <label class="check-field">
+              <input id="linkDisabled" name="disabled" type="checkbox" />
+              <span>Create as disabled</span>
+            </label>
+          </div>
+
           <button type="submit" id="submit-btn">Shorten</button>
           <p id="form-error" class="error" hidden></p>
         </form>
@@ -89,38 +81,137 @@
             <a id="short-url" href="#" target="_blank" rel="noopener"></a>
             <button type="button" id="copy-btn" class="ghost">Copy</button>
           </div>
+          <img id="qr-img" class="qr-img" alt="QR code for this short link" hidden />
+          <p id="anon-tip" class="hint" hidden>
+            Log in before creating links to keep them in My links with analytics.
+          </p>
         </div>
       </section>
 
-      <section class="panel stats-panel" aria-labelledby="stats-heading">
+      <section class="panel stats-panel" id="insights-panel" aria-labelledby="stats-heading" hidden>
         <h2 id="stats-heading">Your insights</h2>
-        <p class="hint">Only you can see stats for links you created while logged in.</p>
-        <form id="stats-form" class="stats-form" autocomplete="off">
-          <label class="field grow">
-            <span>Short code or short link</span>
-            <input
-              id="statsCode"
-              name="statsCode"
-              type="text"
-              placeholder="abc12 or https://your-app.onrender.com/abc12"
-              required
-            />
-          </label>
-          <button type="submit" class="ghost">Fetch</button>
-        </form>
-        <p id="stats-error" class="error" hidden></p>
-        <dl id="stats-result" class="stats" hidden></dl>
+        <p class="hint">Search, edit, and inspect click breakdowns for links you own.</p>
 
         <div class="my-links">
           <div class="my-links-header">
             <h3>My links</h3>
             <button type="button" id="refresh-mine" class="ghost">Refresh</button>
           </div>
-          <ul id="mine-list" class="mine-list"></ul>
-          <p id="mine-empty" class="hint" hidden>No links yet. Create one after logging in.</p>
+          <div class="toolbar">
+            <label class="field grow">
+              <span>Search</span>
+              <input id="mine-search" type="search" placeholder="Code or destination" />
+            </label>
+            <label class="field">
+              <span>Sort</span>
+              <select id="mine-sort">
+                <option value="createdAt:desc">Newest</option>
+                <option value="createdAt:asc">Oldest</option>
+                <option value="clickCount:desc">Most clicks</option>
+                <option value="clickCount:asc">Fewest clicks</option>
+                <option value="shortCode:asc">Code A–Z</option>
+              </select>
+            </label>
+          </div>
+          <div class="table-wrap">
+            <table class="links-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Destination</th>
+                  <th>Clicks</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="mine-body"></tbody>
+            </table>
+          </div>
+          <p id="mine-empty" class="hint" hidden>No links yet. Create one while logged in.</p>
+          <div id="mine-pager" class="pager" hidden>
+            <button type="button" id="mine-prev" class="ghost">Previous</button>
+            <span id="mine-page-label"></span>
+            <button type="button" id="mine-next" class="ghost">Next</button>
+          </div>
         </div>
+
+        <div id="stats-detail" class="stats-detail" hidden>
+          <h3 id="stats-detail-title">Link details</h3>
+          <dl id="stats-result" class="stats"></dl>
+          <div class="stats-actions">
+            <button type="button" id="edit-link-btn" class="ghost">Edit</button>
+            <button type="button" id="delete-link-btn" class="ghost danger">Delete</button>
+          </div>
+          <div id="charts" class="charts"></div>
+        </div>
+        <p id="stats-error" class="error" hidden></p>
       </section>
     </main>
+
+    <dialog id="auth-dialog" class="edit-dialog auth-dialog">
+      <form id="auth-form" method="dialog" autocomplete="on">
+        <h3 id="auth-heading">Log in</h3>
+        <p class="hint">Use an account to save links and unlock insights.</p>
+        <label class="field">
+          <span>Email</span>
+          <input id="authEmail" name="email" type="email" required placeholder="you@example.com" />
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input
+            id="authPassword"
+            name="password"
+            type="password"
+            required
+            minlength="6"
+            placeholder="At least 6 characters"
+          />
+        </label>
+        <p id="auth-error" class="error" hidden></p>
+        <div class="auth-actions">
+          <button type="submit" id="login-btn">Log in</button>
+          <button type="button" id="register-btn" class="ghost">Create account</button>
+          <button type="button" id="auth-cancel" class="ghost">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="edit-dialog" class="edit-dialog">
+      <form id="edit-form" method="dialog">
+        <h3>Edit link</h3>
+        <input type="hidden" id="edit-code" />
+        <label class="field">
+          <span>Destination URL</span>
+          <input id="edit-originalUrl" type="text" required />
+        </label>
+        <label class="field">
+          <span>Custom alias</span>
+          <input id="edit-alias" type="text" maxlength="32" pattern="[a-zA-Z0-9_-]{3,32}" />
+        </label>
+        <label class="field">
+          <span>Expires</span>
+          <input id="edit-expiresAt" type="datetime-local" />
+        </label>
+        <label class="field">
+          <span>New link password <em>(blank keeps current)</em></span>
+          <input id="edit-password" type="password" />
+        </label>
+        <label class="check-field">
+          <input id="edit-clear-password" type="checkbox" />
+          <span>Remove password</span>
+        </label>
+        <label class="check-field">
+          <input id="edit-disabled" type="checkbox" />
+          <span>Disabled</span>
+        </label>
+        <p id="edit-error" class="error" hidden></p>
+        <div class="auth-actions">
+          <button type="submit" value="save" id="edit-save">Save</button>
+          <button type="button" id="edit-cancel" class="ghost" value="cancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
     <script src="/assets/app.js" type="module"></script>
   </body>
 </html>

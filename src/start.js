@@ -1,6 +1,7 @@
-import "dotenv/config";
+import "./config/loadEnv.js";
 import { spawn } from "node:child_process";
 import { applyDatabaseUrl } from "./config/databaseUrl.js";
+import { redisHostname } from "./config/connectRedis.js";
 
 applyDatabaseUrl();
 
@@ -9,6 +10,13 @@ try {
   console.log(`Using database host: ${host}`);
 } catch {
   console.log("DATABASE_URL is missing or invalid");
+}
+
+const redisHost = redisHostname();
+if (redisHost) {
+  console.log(`Using redis host: ${redisHost}`);
+} else {
+  console.log("REDIS_URL is not set; redirects skip cache and clicks save to Postgres");
 }
 
 const runMigrations =

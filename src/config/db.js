@@ -1,3 +1,4 @@
+import "./loadEnv.js";
 import { PrismaClient } from "@prisma/client";
 import { applyDatabaseUrl } from "./databaseUrl.js";
 

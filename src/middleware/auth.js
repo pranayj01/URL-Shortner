@@ -1,33 +1,37 @@
-import { verifyToken } from "../utils/jwt.js";
+import { fromNodeHeaders } from "better-auth/node";
+import { auth } from "../auth.js";
 import { AppError } from "../utils/AppError.js";
 
-export function optionalAuth(req, _res, next) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
-    req.user = null;
-    return next();
-  }
+async function loadSessionUser(req) {
+  const session = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  });
+  if (!session?.user) return null;
+  return {
+    id: session.user.id,
+    email: session.user.email,
+    name: session.user.name,
+  };
+}
 
+export async function optionalAuth(req, _res, next) {
   try {
-    const payload = verifyToken(header.slice(7));
-    req.user = { id: Number(payload.sub), email: payload.email };
+    req.user = await loadSessionUser(req);
   } catch {
     req.user = null;
   }
   next();
 }
 
-export function requireAuth(req, _res, next) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
-    return next(new AppError("Login required", 401));
-  }
-
+export async function requireAuth(req, _res, next) {
   try {
-    const payload = verifyToken(header.slice(7));
-    req.user = { id: Number(payload.sub), email: payload.email };
+    const user = await loadSessionUser(req);
+    if (!user) {
+      return next(new AppError("Login required", 401));
+    }
+    req.user = user;
     next();
   } catch {
-    next(new AppError("Invalid or expired token. Please log in again.", 401));
+    next(new AppError("Invalid or expired session. Please log in again.", 401));
   }
 }

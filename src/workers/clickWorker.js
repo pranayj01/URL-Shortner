@@ -1,25 +1,16 @@
-import "dotenv/config";
-import { createClient } from "redis";
+import "../config/loadEnv.js";
 import {
   persistClickEvent,
   requeueProcessingItem,
 } from "../services/urlService.js";
+import { connectRedis } from "../config/connectRedis.js";
 
 const CLICK_QUEUE_KEY = process.env.CLICK_QUEUE_KEY || "clicks:queue";
 const CLICK_PROCESSING_KEY =
   process.env.CLICK_PROCESSING_KEY || "clicks:processing";
 const BRPOP_TIMEOUT = String(process.env.CLICK_BRPOP_TIMEOUT || 5);
 
-const redisUrl = process.env.REDIS_URL;
-const redisClient = redisUrl
-  ? createClient({ url: redisUrl })
-  : null;
-
-if (redisClient) {
-  redisClient.on("error", (err) => {
-    console.error("Worker Redis Error:", err.message);
-  });
-}
+const redisClient = await connectRedis("Click worker");
 
 function getEventPayload(result) {
   if (!result) return null;
@@ -64,15 +55,8 @@ async function main() {
   );
 
   if (!redisClient) {
-    console.log("REDIS_URL is not set; click worker not needed.");
+    console.log("Click worker idle; clicks still save to Postgres.");
     return;
-  }
-
-  try {
-    await redisClient.connect();
-    console.log("Worker Redis connected");
-  } catch (err) {
-    console.error("Worker Redis connect failed:", err.message);
   }
 
   let processed = 0;
@@ -80,14 +64,9 @@ async function main() {
   let lastLog = Date.now();
 
   while (true) {
-    if (!redisClient?.isReady) {
-      console.log("Redis not ready; worker sleeping...");
-      try {
-        await redisClient.connect();
-      } catch {
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      continue;
+    if (!redisClient.isReady) {
+      console.log("Click worker: Redis dropped. Exiting; API will persist clicks directly.");
+      return;
     }
 
     try {
