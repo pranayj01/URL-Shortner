@@ -14,6 +14,10 @@ A learning-focused URL shortener built with Express, PostgreSQL (Prisma), and Re
 - Simple UI to create, search, edit, and inspect links
 - QR codes, optional link passwords, and disable/archive
 - Click analytics (open time, IP, country, device, browser, referrer, UTM, daily counts)
+- UTM builder when creating links
+- Custom Open Graph preview for social crawlers
+- Folders and tags to organize owned links
+- Webhooks for `link.created` and `link.clicked`
 
 ## Quick start (Docker)
 
@@ -50,14 +54,17 @@ Open http://localhost:3000
 | `POST` | `/api/auth/sign-out` | Log out |
 | `GET` | `/api/auth/get-session` | Current session `{ user, session }` or empty |
 | `GET` | `/api/me` | Current user (session cookie required) |
-| `POST` | `/api/shorten` | Create short URL (public; attaches owner if logged in). Optional `password`, `disabled` when authenticated |
-| `GET` | `/api/urls/mine` | List your links (`q`, `sort`, `order`, `page`, `limit`) |
+| `POST` | `/api/shorten` | Create short URL (public). Optional UTM, and when logged in: `password`, `disabled`, `tags`, `folderId`, `ogTitle`, `ogDescription`, `ogImage` |
+| `GET` | `/api/urls/mine` | List your links (`q`, `sort`, `order`, `page`, `limit`, `tag`, `folderId`) |
 | `GET` | `/api/urls/:code` | Stats for a link you own |
-| `PATCH` | `/api/urls/:code` | Edit destination, alias, expiry, password, disabled |
+| `PATCH` | `/api/urls/:code` | Edit destination, alias, expiry, password, disabled, OG, tags, folder |
 | `DELETE` | `/api/urls/:code` | Delete a link you own |
-| `GET` | `/api/urls/:code/analytics` | Click breakdown (country, device, referrer, UTM, timeseries) |
+| `GET` | `/api/urls/:code/analytics` | Click breakdown (country, device, referrer, UTM, timeseries, recent opens) |
 | `GET` | `/api/urls/:code/qr` | PNG QR (owner) |
-| `GET` | `/:code` | Redirect (public). Password links show a gate; `POST` with `password` to unlock |
+| `GET`/`POST`/`DELETE` | `/api/folders` | Manage folders |
+| `GET`/`POST`/`DELETE` | `/api/tags` | Manage tags |
+| `GET`/`POST`/`PATCH`/`DELETE` | `/api/webhooks` | Manage webhooks (`link.created`, `link.clicked`) |
+| `GET` | `/:code` | Redirect (public). Social bots get OG HTML when configured |
 | `GET` | `/:code/qr.png` | Public PNG QR of the short URL |
 | `GET` | `/health` | Liveness + dependency status |
 

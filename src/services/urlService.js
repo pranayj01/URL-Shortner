@@ -3,6 +3,12 @@ import prisma from "../config/db.js";
 import { encodeToBase62 } from "../utils/base62.js";
 import { AppError } from "../utils/AppError.js";
 import redisClient from "../config/redis.js";
+import { appendUtmParams } from "../utils/utm.js";
+import {
+  assertFolderOwned,
+  resolveTagIdsForUser,
+} from "./tagFolderService.js";
+import { enqueueWebhook } from "./webhookService.js";
 
 const CLICK_QUEUE_KEY = process.env.CLICK_QUEUE_KEY || "clicks:queue";
 const CLICK_PROCESSING_KEY =
@@ -19,6 +25,16 @@ const URL_PUBLIC_SELECT = {
   disabled: true,
   userId: true,
   passwordHash: true,
+  ogTitle: true,
+  ogDescription: true,
+  ogImage: true,
+  folderId: true,
+  folder: { select: { id: true, name: true } },
+  tags: {
+    select: {
+      tag: { select: { id: true, name: true } },
+    },
+  },
 };
 
 function cacheKey(code) {
@@ -27,11 +43,19 @@ function cacheKey(code) {
 
 function toPublicUrl(row) {
   if (!row) return null;
-  const { passwordHash, userId, ...rest } = row;
+  const { passwordHash, userId, tags, folder, ...rest } = row;
   return {
     ...rest,
     hasPassword: Boolean(passwordHash),
+    folder: folder || null,
+    tags: (tags || []).map((entry) => entry.tag),
   };
+}
+
+function normalizeOg(value, max = 300) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  return String(value).trim().slice(0, max) || null;
 }
 
 export async function invalidateUrlCache(code) {
@@ -58,10 +82,12 @@ async function readCachedUrl(code) {
 async function writeCachedUrl(code, payload, expiresAt) {
   if (!redisClient?.isReady) return;
   if (payload.hasPassword || payload.disabled) return;
+  if (payload.ogTitle || payload.ogDescription || payload.ogImage) return;
   const value = JSON.stringify({
     originalUrl: payload.originalUrl,
     disabled: false,
     hasPassword: false,
+    hasOg: false,
   });
   try {
     if (expiresAt) {
@@ -95,13 +121,40 @@ export async function createShortUrl(
   expiresAt,
   customAlias,
   userId,
-  { password, disabled } = {}
+  {
+    password,
+    disabled,
+    utm,
+    ogTitle,
+    ogDescription,
+    ogImage,
+    folderId,
+    tags,
+  } = {}
 ) {
   const ownerId = userId || null;
   const passwordHash = await hashLinkPassword(password);
   const disabledFlag = Boolean(disabled);
+  const destination = appendUtmParams(originalUrl, utm || {});
+
+  let resolvedFolderId = null;
+  let tagIds = [];
+  if (ownerId) {
+    if (folderId) {
+      await assertFolderOwned(ownerId, folderId);
+      resolvedFolderId = folderId;
+    }
+    tagIds = await resolveTagIdsForUser(ownerId, tags);
+  }
+
+  const og = {
+    ogTitle: normalizeOg(ogTitle, 120),
+    ogDescription: normalizeOg(ogDescription, 300),
+    ogImage: normalizeOg(ogImage, 500),
+  };
 
   try {
+    let created;
     if (customAlias) {
       const existing = await prisma.url.findUnique({
         where: { shortCode: customAlias },
@@ -110,38 +163,56 @@ export async function createShortUrl(
         throw new AppError("Custom alias already in use", 409);
       }
 
-      await prisma.url.create({
+      created = await prisma.url.create({
         data: {
-          originalUrl,
+          originalUrl: destination,
           expiresAt: expiresAt ?? null,
           shortCode: customAlias,
           userId: ownerId,
           passwordHash,
           disabled: disabledFlag,
+          folderId: resolvedFolderId,
+          ...og,
+          tags: tagIds.length
+            ? { create: tagIds.map((tagId) => ({ tagId })) }
+            : undefined,
         },
+        select: URL_PUBLIC_SELECT,
       });
-
-      return { shortCode: customAlias };
+    } else {
+      created = await prisma.$transaction(async (tx) => {
+        const row = await tx.url.create({
+          data: {
+            originalUrl: destination,
+            expiresAt: expiresAt ?? null,
+            userId: ownerId,
+            passwordHash,
+            disabled: disabledFlag,
+            folderId: resolvedFolderId,
+            ...og,
+            tags: tagIds.length
+              ? { create: tagIds.map((tagId) => ({ tagId })) }
+              : undefined,
+          },
+        });
+        const code = encodeToBase62(row.id);
+        return tx.url.update({
+          where: { id: row.id },
+          data: { shortCode: code },
+          select: URL_PUBLIC_SELECT,
+        });
+      });
     }
 
-    const urlEntry = await prisma.$transaction(async (tx) => {
-      const row = await tx.url.create({
-        data: {
-          originalUrl,
-          expiresAt: expiresAt ?? null,
-          userId: ownerId,
-          passwordHash,
-          disabled: disabledFlag,
-        },
+    if (ownerId) {
+      enqueueWebhook(ownerId, "link.created", {
+        shortCode: created.shortCode,
+        originalUrl: created.originalUrl,
+        id: created.id,
       });
-      const code = encodeToBase62(row.id);
-      return tx.url.update({
-        where: { id: row.id },
-        data: { shortCode: code },
-      });
-    });
+    }
 
-    return { shortCode: urlEntry.shortCode };
+    return toPublicUrl(created);
   } catch (error) {
     mapPrismaError(error);
   }
@@ -149,13 +220,16 @@ export async function createShortUrl(
 
 export async function findOriginalUrl(code) {
   const cached = await readCachedUrl(code);
-  if (cached?.originalUrl && !cached.hasPassword && !cached.disabled) {
+  if (cached?.originalUrl && !cached.hasPassword && !cached.disabled && !cached.hasOg) {
     return {
       originalUrl: cached.originalUrl,
       expiresAt: null,
       disabled: false,
       hasPassword: false,
       passwordHash: null,
+      ogTitle: null,
+      ogDescription: null,
+      ogImage: null,
       fromCache: true,
     };
   }
@@ -178,6 +252,10 @@ export async function findOriginalUrl(code) {
     disabled: urlEntry.disabled,
     hasPassword: Boolean(urlEntry.passwordHash),
     passwordHash: urlEntry.passwordHash,
+    ogTitle: urlEntry.ogTitle,
+    ogDescription: urlEntry.ogDescription,
+    ogImage: urlEntry.ogImage,
+    userId: urlEntry.userId,
     fromCache: false,
   };
 }
@@ -215,7 +293,15 @@ export async function getUrlStatsForOwner(code, userId) {
 
 export async function listUrlsForUser(
   userId,
-  { q = "", sort = "createdAt", order = "desc", page = 1, limit = 20 } = {}
+  {
+    q = "",
+    sort = "createdAt",
+    order = "desc",
+    page = 1,
+    limit = 20,
+    tag,
+    folderId,
+  } = {}
 ) {
   const take = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const currentPage = Math.max(Number(page) || 1, 1);
@@ -230,7 +316,13 @@ export async function listUrlsForUser(
     where.OR = [
       { shortCode: { contains: query, mode: "insensitive" } },
       { originalUrl: { contains: query, mode: "insensitive" } },
+      { ogTitle: { contains: query, mode: "insensitive" } },
     ];
+  }
+  if (folderId) where.folderId = folderId;
+  const tagName = String(tag || "").trim();
+  if (tagName) {
+    where.tags = { some: { tag: { name: tagName, userId } } };
   }
 
   const [rows, total] = await Promise.all([
@@ -256,7 +348,9 @@ export async function updateUrlForOwner(code, userId, patch) {
   const existing = await requireOwnedUrl(code, userId);
   const data = {};
 
-  if (patch.originalUrl !== undefined) data.originalUrl = patch.originalUrl;
+  if (patch.originalUrl !== undefined) {
+    data.originalUrl = appendUtmParams(patch.originalUrl, patch.utm || {});
+  }
   if (patch.expiresAt !== undefined) data.expiresAt = patch.expiresAt;
   if (patch.disabled !== undefined) data.disabled = Boolean(patch.disabled);
 
@@ -268,6 +362,29 @@ export async function updateUrlForOwner(code, userId, patch) {
     data.passwordHash = null;
   } else if (patch.password) {
     data.passwordHash = await hashLinkPassword(patch.password);
+  }
+
+  if (patch.ogTitle !== undefined) data.ogTitle = normalizeOg(patch.ogTitle, 120);
+  if (patch.ogDescription !== undefined) {
+    data.ogDescription = normalizeOg(patch.ogDescription, 300);
+  }
+  if (patch.ogImage !== undefined) data.ogImage = normalizeOg(patch.ogImage, 500);
+
+  if (patch.folderId !== undefined) {
+    if (patch.folderId === null || patch.folderId === "") {
+      data.folderId = null;
+    } else {
+      await assertFolderOwned(userId, patch.folderId);
+      data.folderId = patch.folderId;
+    }
+  }
+
+  if (patch.tags !== undefined) {
+    const tagIds = await resolveTagIdsForUser(userId, patch.tags);
+    data.tags = {
+      deleteMany: {},
+      create: tagIds.map((tagId) => ({ tagId })),
+    };
   }
 
   let updated;
@@ -479,7 +596,7 @@ export async function persistClickEvent(rawPayload) {
   const result = await prisma.$transaction(async (tx) => {
     const url = await tx.url.findUnique({
       where: { shortCode },
-      select: { id: true },
+      select: { id: true, userId: true, originalUrl: true },
     });
     if (!url) return { ok: false, reason: "missing_url" };
 
@@ -504,10 +621,30 @@ export async function persistClickEvent(rawPayload) {
       data: { clickCount: { increment: 1 } },
     });
 
-    return { ok: true };
+    return {
+      ok: true,
+      userId: url.userId,
+      originalUrl: url.originalUrl,
+    };
   });
 
-  return result;
+  if (result?.ok && result.userId) {
+    enqueueWebhook(result.userId, "link.clicked", {
+      shortCode,
+      originalUrl: result.originalUrl,
+      clickedAt: clickedAt.toISOString(),
+      ipAddress: evt.ipAddress ?? null,
+      country: evt.country ?? null,
+      device: evt.device ?? null,
+      browser: evt.browser ?? null,
+      referrer: evt.referrer ?? null,
+      utmSource: evt.utmSource ?? null,
+      utmMedium: evt.utmMedium ?? null,
+      utmCampaign: evt.utmCampaign ?? null,
+    });
+  }
+
+  return result?.ok ? { ok: true } : result;
 }
 
 export async function requeueProcessingItem(rawPayload) {

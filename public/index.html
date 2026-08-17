@@ -28,31 +28,18 @@
       <section class="panel" aria-labelledby="shorten-heading">
         <h1 id="shorten-heading" class="visually-hidden">Create a short link</h1>
         <p class="hint" id="shorten-hint">
-          Anyone can create a short link. Log in to save links to your account and view insights.
+          Anyone can create a short link. Log in to save links, tags, OG previews, and webhooks.
         </p>
         <form id="shorten-form" autocomplete="off">
           <label class="field">
             <span>Long URL</span>
-            <input
-              id="originalUrl"
-              name="originalUrl"
-              type="text"
-              placeholder="example.com/very/long/path"
-              required
-            />
+            <input id="originalUrl" name="originalUrl" type="text" placeholder="example.com/very/long/path" required />
           </label>
 
           <div class="row">
             <label class="field">
               <span>Custom alias <em>(optional)</em></span>
-              <input
-                id="customAlias"
-                name="customAlias"
-                type="text"
-                placeholder="my-link"
-                maxlength="32"
-                pattern="[a-zA-Z0-9_-]{3,32}"
-              />
+              <input id="customAlias" name="customAlias" type="text" placeholder="my-link" maxlength="32" pattern="[a-zA-Z0-9_-]{3,32}" />
             </label>
             <label class="field">
               <span>Expires <em>(optional)</em></span>
@@ -60,14 +47,57 @@
             </label>
           </div>
 
-          <div class="row owner-only" hidden>
+          <div class="row">
             <label class="field">
-              <span>Link password <em>(optional)</em></span>
-              <input id="linkPassword" name="password" type="password" placeholder="Leave blank for public" />
+              <span>utm_source</span>
+              <input id="utmSource" type="text" placeholder="twitter" />
             </label>
-            <label class="check-field">
-              <input id="linkDisabled" name="disabled" type="checkbox" />
-              <span>Create as disabled</span>
+            <label class="field">
+              <span>utm_medium</span>
+              <input id="utmMedium" type="text" placeholder="social" />
+            </label>
+            <label class="field">
+              <span>utm_campaign</span>
+              <input id="utmCampaign" type="text" placeholder="launch" />
+            </label>
+          </div>
+
+          <div class="owner-only" hidden>
+            <div class="row">
+              <label class="field">
+                <span>Link password</span>
+                <input id="linkPassword" name="password" type="password" placeholder="Leave blank for public" />
+              </label>
+              <label class="check-field">
+                <input id="linkDisabled" name="disabled" type="checkbox" />
+                <span>Create as disabled</span>
+              </label>
+            </div>
+            <div class="row">
+              <label class="field">
+                <span>Folder</span>
+                <select id="linkFolder">
+                  <option value="">No folder</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Tags <em>(comma-separated)</em></span>
+                <input id="linkTags" type="text" placeholder="launch, ads" />
+              </label>
+            </div>
+            <div class="row">
+              <label class="field">
+                <span>OG title</span>
+                <input id="ogTitle" type="text" placeholder="Shared title" maxlength="120" />
+              </label>
+              <label class="field">
+                <span>OG image URL</span>
+                <input id="ogImage" type="url" placeholder="https://…" />
+              </label>
+            </div>
+            <label class="field">
+              <span>OG description</span>
+              <input id="ogDescription" type="text" placeholder="Shown when shared on social" maxlength="300" />
             </label>
           </div>
 
@@ -90,17 +120,47 @@
 
       <section class="panel stats-panel" id="insights-panel" aria-labelledby="stats-heading" hidden>
         <h2 id="stats-heading">Your insights</h2>
-        <p class="hint">Search, edit, and inspect click breakdowns for links you own.</p>
+        <p class="hint">Search, organize, and inspect click breakdowns for links you own.</p>
+
+        <div class="org-tools">
+          <div class="row">
+            <label class="field grow">
+              <span>New folder</span>
+              <input id="new-folder" type="text" placeholder="Campaigns" />
+            </label>
+            <button type="button" id="add-folder-btn" class="ghost">Add folder</button>
+          </div>
+          <div class="row">
+            <label class="field grow">
+              <span>New tag</span>
+              <input id="new-tag" type="text" placeholder="newsletter" />
+            </label>
+            <button type="button" id="add-tag-btn" class="ghost">Add tag</button>
+          </div>
+          <p id="org-error" class="error" hidden></p>
+        </div>
 
         <div class="my-links">
           <div class="my-links-header">
             <h3>My links</h3>
             <button type="button" id="refresh-mine" class="ghost">Refresh</button>
           </div>
-          <div class="toolbar">
+          <div class="toolbar toolbar-3">
             <label class="field grow">
               <span>Search</span>
               <input id="mine-search" type="search" placeholder="Code or destination" />
+            </label>
+            <label class="field">
+              <span>Folder</span>
+              <select id="mine-folder">
+                <option value="">All folders</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Tag</span>
+              <select id="mine-tag">
+                <option value="">All tags</option>
+              </select>
             </label>
             <label class="field">
               <span>Sort</span>
@@ -146,6 +206,32 @@
           <div id="charts" class="charts"></div>
         </div>
         <p id="stats-error" class="error" hidden></p>
+
+        <div class="webhook-panel">
+          <h3>Webhooks</h3>
+          <p class="hint">Get notified on <code>link.created</code> and <code>link.clicked</code>.</p>
+          <form id="webhook-form" class="webhook-form">
+            <label class="field grow">
+              <span>Endpoint URL</span>
+              <input id="webhook-url" type="url" placeholder="https://example.com/hooks/shortlink" required />
+            </label>
+            <label class="field">
+              <span>Secret <em>(optional)</em></span>
+              <input id="webhook-secret" type="text" placeholder="signing secret" />
+            </label>
+            <label class="check-field">
+              <input id="webhook-created" type="checkbox" checked />
+              <span>link.created</span>
+            </label>
+            <label class="check-field">
+              <input id="webhook-clicked" type="checkbox" checked />
+              <span>link.clicked</span>
+            </label>
+            <button type="submit" id="webhook-save">Add webhook</button>
+          </form>
+          <p id="webhook-error" class="error" hidden></p>
+          <ul id="webhook-list" class="webhook-list"></ul>
+        </div>
       </section>
     </main>
 
@@ -159,14 +245,7 @@
         </label>
         <label class="field">
           <span>Password</span>
-          <input
-            id="authPassword"
-            name="password"
-            type="password"
-            required
-            minlength="6"
-            placeholder="At least 6 characters"
-          />
+          <input id="authPassword" name="password" type="password" required minlength="6" placeholder="At least 6 characters" />
         </label>
         <p id="auth-error" class="error" hidden></p>
         <div class="auth-actions">
@@ -192,6 +271,26 @@
         <label class="field">
           <span>Expires</span>
           <input id="edit-expiresAt" type="datetime-local" />
+        </label>
+        <label class="field">
+          <span>Folder</span>
+          <select id="edit-folder"></select>
+        </label>
+        <label class="field">
+          <span>Tags <em>(comma-separated)</em></span>
+          <input id="edit-tags" type="text" />
+        </label>
+        <label class="field">
+          <span>OG title</span>
+          <input id="edit-ogTitle" type="text" maxlength="120" />
+        </label>
+        <label class="field">
+          <span>OG description</span>
+          <input id="edit-ogDescription" type="text" maxlength="300" />
+        </label>
+        <label class="field">
+          <span>OG image URL</span>
+          <input id="edit-ogImage" type="url" />
         </label>
         <label class="field">
           <span>New link password <em>(blank keeps current)</em></span>

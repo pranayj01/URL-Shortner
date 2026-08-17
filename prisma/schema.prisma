@@ -22,6 +22,9 @@ model User {
   sessions      Session[]
   accounts      Account[]
   urls          Url[]
+  folders       Folder[]
+  tags          Tag[]
+  webhooks      Webhook[]
 
   @@unique([email])
   @@map("user")
@@ -75,21 +78,76 @@ model Verification {
   @@map("verification")
 }
 
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  urls      Url[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  urls      UrlTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model UrlTag {
+  urlId Int
+  tagId String
+  url   Url @relation(fields: [urlId], references: [id], onDelete: Cascade)
+  tag   Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([urlId, tagId])
+  @@index([tagId])
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String
+  secret    String?
+  events    String[]
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model Url {
-  id           Int          @id @default(autoincrement())
-  originalUrl  String
-  shortCode    String?      @unique
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  expiresAt    DateTime?
-  clickCount   Int          @default(0)
-  disabled     Boolean      @default(false)
-  passwordHash String?
-  userId       String?
-  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  clickEvents  ClickEvent[]
+  id            Int          @id @default(autoincrement())
+  originalUrl   String
+  shortCode     String?      @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  expiresAt     DateTime?
+  clickCount    Int          @default(0)
+  disabled      Boolean      @default(false)
+  passwordHash  String?
+  ogTitle       String?
+  ogDescription String?
+  ogImage       String?
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  folderId      String?
+  folder        Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  tags          UrlTag[]
+  clickEvents   ClickEvent[]
 
   @@index([userId, createdAt(sort: Desc)])
+  @@index([folderId])
 }
 
 model ClickEvent {

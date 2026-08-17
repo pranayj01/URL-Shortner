@@ -531,6 +531,50 @@ button.danger {
   width: min(400px, 92vw);
 }
 
+.webhook-panel {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.webhook-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.webhook-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.webhook-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
+  font-size: 0.9rem;
+}
+
+.toolbar-3 {
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+}
+
+.org-tools {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 640px) {
+  .toolbar-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .brand-row {
     flex-direction: column;

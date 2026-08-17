@@ -1,3 +1,5 @@
+import { normalizeUtmInput } from "../utils/utm.js";
+
 const ALIAS_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
 const RESERVED_ALIASES = new Set([
   "api",
@@ -56,6 +58,50 @@ function normalizeExpiresAt(expiresAt, { allowNull = false } = {}) {
   return { expiresAt: date };
 }
 
+function normalizeTags(tags) {
+  if (tags === undefined) return undefined;
+  if (!Array.isArray(tags)) {
+    if (typeof tags === "string") {
+      return tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .slice(0, 20);
+    }
+    return { error: "tags must be an array or comma-separated string" };
+  }
+  return tags
+    .map((t) => String(t || "").trim())
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+function normalizeOgFields(body) {
+  const out = {};
+  for (const key of ["ogTitle", "ogDescription", "ogImage"]) {
+    if (body[key] === undefined) continue;
+    if (body[key] === null || body[key] === "") {
+      out[key] = null;
+      continue;
+    }
+    if (typeof body[key] !== "string") {
+      return { error: `${key} must be a string` };
+    }
+    out[key] = body[key].trim();
+  }
+  if (out.ogImage) {
+    try {
+      const parsed = new URL(out.ogImage);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return { error: "ogImage must be an http(s) URL" };
+      }
+    } catch {
+      return { error: "ogImage must be a valid URL" };
+    }
+  }
+  return out;
+}
+
 export function validateUrl(req, res, next) {
   const parsedUrl = normalizeOriginalUrl(req.body.originalUrl);
   if (parsedUrl.error) {
@@ -85,6 +131,22 @@ export function validateUrl(req, res, next) {
 
   if (req.body.disabled !== undefined) {
     req.body.disabled = Boolean(req.body.disabled);
+  }
+
+  const utm = normalizeUtmInput(req.body);
+  if (utm.error) return res.status(400).json({ message: utm.error });
+  req.body.utm = utm;
+
+  const og = normalizeOgFields(req.body);
+  if (og.error) return res.status(400).json({ message: og.error });
+  Object.assign(req.body, og);
+
+  const tags = normalizeTags(req.body.tags);
+  if (tags?.error) return res.status(400).json({ message: tags.error });
+  req.body.tags = tags;
+
+  if (req.body.folderId === "" || req.body.folderId === null) {
+    req.body.folderId = undefined;
   }
 
   next();
@@ -131,6 +193,22 @@ export function validateUrlPatch(req, res, next) {
   } else {
     req.body.password = undefined;
   }
+
+  const utm = normalizeUtmInput(body);
+  if (utm.error) return res.status(400).json({ message: utm.error });
+  req.body.utm = utm;
+
+  const og = normalizeOgFields(body);
+  if (og.error) return res.status(400).json({ message: og.error });
+  Object.assign(req.body, og);
+
+  if (body.tags !== undefined) {
+    const tags = normalizeTags(body.tags);
+    if (tags?.error) return res.status(400).json({ message: tags.error });
+    req.body.tags = tags;
+  }
+
+  if (body.folderId === "") req.body.folderId = null;
 
   next();
 }

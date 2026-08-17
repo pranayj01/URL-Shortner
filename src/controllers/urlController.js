@@ -13,7 +13,12 @@ import {
 } from "../services/urlService.js";
 import { extractClickMeta } from "../utils/clickMeta.js";
 import { hasUnlockCookie, setUnlockCookie } from "../utils/linkAccess.js";
-import { passwordGatePage, simpleMessagePage } from "../utils/htmlPages.js";
+import {
+  passwordGatePage,
+  simpleMessagePage,
+  ogPreviewPage,
+} from "../utils/htmlPages.js";
+import { hasOgPreview, isSocialBot } from "../utils/bots.js";
 
 function buildShortUrl(shortCode) {
   const base = (
@@ -36,15 +41,37 @@ function wantsHtml(req) {
 
 export async function shortenUrl(req, res, next) {
   try {
-    const { originalUrl, expiresAt, customAlias, password, disabled } = req.body;
+    const {
+      originalUrl,
+      expiresAt,
+      customAlias,
+      password,
+      disabled,
+      utm,
+      ogTitle,
+      ogDescription,
+      ogImage,
+      folderId,
+      tags,
+    } = req.body;
     const result = await createShortUrl(
       originalUrl,
       expiresAt,
       customAlias,
       req.user?.id ?? null,
-      { password, disabled }
+      {
+        password,
+        disabled,
+        utm,
+        ogTitle,
+        ogDescription,
+        ogImage,
+        folderId,
+        tags,
+      }
     );
     res.status(201).json({
+      ...withShortUrl(result),
       shortCode: result.shortCode,
       shortUrl: buildShortUrl(result.shortCode),
     });
@@ -60,7 +87,10 @@ export async function redirectUrl(req, res, next) {
 
     if (!urlData) {
       if (wantsHtml(req)) {
-        res.status(404).type("html").send(simpleMessagePage("Not found", "That short link does not exist."));
+        res
+          .status(404)
+          .type("html")
+          .send(simpleMessagePage("Not found", "That short link does not exist."));
         return;
       }
       return res.status(404).json({ message: "URL not found" });
@@ -68,7 +98,15 @@ export async function redirectUrl(req, res, next) {
 
     if (urlData.disabled) {
       if (wantsHtml(req) || req.method === "POST") {
-        res.status(410).type("html").send(simpleMessagePage("Link disabled", "This short link has been turned off."));
+        res
+          .status(410)
+          .type("html")
+          .send(
+            simpleMessagePage(
+              "Link disabled",
+              "This short link has been turned off."
+            )
+          );
         return;
       }
       return res.status(410).json({ message: "This short link has been disabled" });
@@ -97,11 +135,33 @@ export async function redirectUrl(req, res, next) {
       await cachePublicRedirect(code, urlData);
     }
 
-    enqueueClickEvent(code, extractClickMeta(req));
+    const bot = isSocialBot(req);
+    if (bot && hasOgPreview(urlData)) {
+      res
+        .status(200)
+        .type("html")
+        .send(
+          ogPreviewPage({
+            title: urlData.ogTitle,
+            description: urlData.ogDescription,
+            image: urlData.ogImage,
+            destination: urlData.originalUrl,
+            shortUrl: buildShortUrl(code),
+          })
+        );
+      return;
+    }
+
+    if (!bot) {
+      enqueueClickEvent(code, extractClickMeta(req));
+    }
     return res.redirect(urlData.originalUrl);
   } catch (error) {
     if (error.statusCode === 410 && wantsHtml(req)) {
-      res.status(410).type("html").send(simpleMessagePage("Expired", error.message));
+      res
+        .status(410)
+        .type("html")
+        .send(simpleMessagePage("Expired", error.message));
       return;
     }
     next(error);
@@ -133,6 +193,12 @@ export async function updateUrl(req, res, next) {
       disabled: req.body.disabled,
       password: req.body.password,
       clearPassword: req.body.clearPassword,
+      utm: req.body.utm,
+      ogTitle: req.body.ogTitle,
+      ogDescription: req.body.ogDescription,
+      ogImage: req.body.ogImage,
+      folderId: req.body.folderId,
+      tags: req.body.tags,
     });
     res.json(withShortUrl(updated));
   } catch (error) {
@@ -169,6 +235,8 @@ export async function myUrls(req, res, next) {
       order: req.query.order,
       page: req.query.page,
       limit: req.query.limit,
+      tag: req.query.tag,
+      folderId: req.query.folderId,
     });
     res.json({
       ...result,

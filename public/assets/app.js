@@ -15,6 +15,7 @@ const statsResult = document.getElementById("stats-result");
 const statsDetail = document.getElementById("stats-detail");
 const chartsEl = document.getElementById("charts");
 const insightsPanel = document.getElementById("insights-panel");
+const orgError = document.getElementById("org-error");
 
 const authForm = document.getElementById("auth-form");
 const authDialog = document.getElementById("auth-dialog");
@@ -28,6 +29,8 @@ const mineBody = document.getElementById("mine-body");
 const mineEmpty = document.getElementById("mine-empty");
 const mineSearch = document.getElementById("mine-search");
 const mineSort = document.getElementById("mine-sort");
+const mineFolder = document.getElementById("mine-folder");
+const mineTag = document.getElementById("mine-tag");
 const minePager = document.getElementById("mine-pager");
 const minePrev = document.getElementById("mine-prev");
 const mineNext = document.getElementById("mine-next");
@@ -35,12 +38,17 @@ const minePageLabel = document.getElementById("mine-page-label");
 const editDialog = document.getElementById("edit-dialog");
 const editForm = document.getElementById("edit-form");
 const editError = document.getElementById("edit-error");
+const webhookForm = document.getElementById("webhook-form");
+const webhookList = document.getElementById("webhook-list");
+const webhookError = document.getElementById("webhook-error");
 
 let currentUser = null;
 let minePage = 1;
 let mineTotal = 0;
 let selectedCode = null;
 let searchTimer = 0;
+let foldersCache = [];
+let tagsCache = [];
 
 function showError(el, message) {
   el.hidden = !message;
@@ -72,10 +80,7 @@ async function api(path, options = {}) {
 }
 
 async function authRequest(path, body) {
-  return api(path, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return api(path, { method: "POST", body: JSON.stringify(body) });
 }
 
 function statusLabel(item) {
@@ -95,6 +100,71 @@ function setOwnerOnlyVisible(visible) {
   }
 }
 
+function fillSelect(select, items, { allLabel, valueKey = "id", labelKey = "name", allValue = "" } = {}) {
+  const current = select.value;
+  select.innerHTML = "";
+  if (allLabel) {
+    const opt = document.createElement("option");
+    opt.value = allValue;
+    opt.textContent = allLabel;
+    select.appendChild(opt);
+  }
+  for (const item of items) {
+    const opt = document.createElement("option");
+    opt.value = item[valueKey];
+    opt.textContent = item[labelKey];
+    select.appendChild(opt);
+  }
+  if ([...select.options].some((o) => o.value === current)) {
+    select.value = current;
+  }
+}
+
+async function loadOrgMeta() {
+  if (!currentUser) return;
+  const [foldersRes, tagsRes] = await Promise.all([
+    api("/api/folders"),
+    api("/api/tags"),
+  ]);
+  foldersCache = foldersRes.folders || [];
+  tagsCache = tagsRes.tags || [];
+  fillSelect(document.getElementById("linkFolder"), foldersCache, {
+    allLabel: "No folder",
+    allValue: "",
+  });
+  fillSelect(mineFolder, foldersCache, { allLabel: "All folders", allValue: "" });
+  fillSelect(mineTag, tagsCache, {
+    allLabel: "All tags",
+    allValue: "",
+    valueKey: "name",
+  });
+  fillSelect(document.getElementById("edit-folder"), foldersCache, {
+    allLabel: "No folder",
+    allValue: "",
+  });
+}
+
+async function loadWebhooks() {
+  if (!currentUser) return;
+  const data = await api("/api/webhooks");
+  webhookList.innerHTML = "";
+  for (const hook of data.webhooks || []) {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <div>
+        <strong>${hook.url}</strong>
+        <div class="hint">${(hook.events || []).join(", ")} · ${hook.enabled ? "on" : "off"}</div>
+      </div>
+      <button type="button" class="ghost danger" data-id="${hook.id}">Delete</button>
+    `;
+    li.querySelector("button").addEventListener("click", async () => {
+      await api(`/api/webhooks/${hook.id}`, { method: "DELETE" });
+      await loadWebhooks();
+    });
+    webhookList.appendChild(li);
+  }
+}
+
 function clearLocalAuthState() {
   currentUser = null;
   mineBody.innerHTML = "";
@@ -102,11 +172,12 @@ function clearLocalAuthState() {
   minePager.hidden = true;
   statsDetail.hidden = true;
   insightsPanel.hidden = true;
+  webhookList.innerHTML = "";
   showError(statsError, "");
   setOwnerOnlyVisible(false);
   if (shortenHint) {
     shortenHint.textContent =
-      "Anyone can create a short link. Log in to save links to your account and view insights.";
+      "Anyone can create a short link. Log in to save links, tags, OG previews, and webhooks.";
   }
 }
 
@@ -126,13 +197,13 @@ function renderAuthStatus() {
     setOwnerOnlyVisible(true);
     if (shortenHint) {
       shortenHint.textContent =
-        "Links you create while logged in appear under Your insights.";
+        "Logged-in links support folders, tags, OG previews, and webhooks.";
     }
     document.getElementById("logout-btn").addEventListener("click", async () => {
       try {
         await authRequest("/api/auth/sign-out", {});
       } catch {
-        // Session may already be gone.
+        // ignore
       }
       clearLocalAuthState();
       renderAuthStatus();
@@ -153,7 +224,11 @@ async function refreshSession() {
     currentUser = null;
   }
   renderAuthStatus();
-  if (currentUser) await loadMyLinks();
+  if (currentUser) {
+    await loadOrgMeta();
+    await loadMyLinks();
+    await loadWebhooks();
+  }
 }
 
 async function loadMyLinks() {
@@ -166,6 +241,8 @@ async function loadMyLinks() {
     page: String(minePage),
     limit: String(PAGE_SIZE),
   });
+  if (mineFolder.value) params.set("folderId", mineFolder.value);
+  if (mineTag.value) params.set("tag", mineTag.value);
   try {
     const data = await api(`/api/urls/mine?${params}`);
     mineTotal = data.total || 0;
@@ -177,9 +254,18 @@ async function loadMyLinks() {
     }
     mineEmpty.hidden = true;
     for (const item of data.urls) {
+      const meta = [
+        item.folder?.name,
+        ...(item.tags || []).map((t) => t.name),
+      ]
+        .filter(Boolean)
+        .join(" · ");
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><a href="${item.shortUrl}" target="_blank" rel="noopener">${item.shortCode}</a></td>
+        <td>
+          <a href="${item.shortUrl}" target="_blank" rel="noopener">${item.shortCode}</a>
+          ${meta ? `<div class="hint">${meta}</div>` : ""}
+        </td>
         <td class="dest">${item.originalUrl}</td>
         <td>${item.clickCount}</td>
         <td><span class="badge">${statusLabel(item)}</span></td>
@@ -263,16 +349,17 @@ async function loadStats(code) {
       api(`/api/urls/${encodeURIComponent(code)}`),
       api(`/api/urls/${encodeURIComponent(code)}/analytics`),
     ]);
+    const tagNames = (data.tags || []).map((t) => t.name).join(", ") || "—";
     const rows = [
       ["Short URL", data.shortUrl],
       ["Original", data.originalUrl],
       ["Clicks", String(data.clickCount)],
       ["Status", statusLabel(data)],
+      ["Folder", data.folder?.name || "—"],
+      ["Tags", tagNames],
+      ["OG title", data.ogTitle || "—"],
       ["Created", new Date(data.createdAt).toLocaleString()],
-      [
-        "Expires",
-        data.expiresAt ? new Date(data.expiresAt).toLocaleString() : "Never",
-      ],
+      ["Expires", data.expiresAt ? new Date(data.expiresAt).toLocaleString() : "Never"],
     ];
     statsResult.innerHTML = "";
     for (const [label, value] of rows) {
@@ -295,11 +382,14 @@ async function loadStats(code) {
       barChart("Referrers", analytics.referrers) +
       barChart("UTM sources", analytics.utmSources);
     statsDetail.hidden = false;
-    statsDetail.dataset.shortUrl = data.shortUrl;
     statsDetail.dataset.originalUrl = data.originalUrl;
     statsDetail.dataset.expiresAt = data.expiresAt || "";
     statsDetail.dataset.disabled = data.disabled ? "1" : "";
-    statsDetail.dataset.hasPassword = data.hasPassword ? "1" : "";
+    statsDetail.dataset.folderId = data.folderId || "";
+    statsDetail.dataset.tags = (data.tags || []).map((t) => t.name).join(", ");
+    statsDetail.dataset.ogTitle = data.ogTitle || "";
+    statsDetail.dataset.ogDescription = data.ogDescription || "";
+    statsDetail.dataset.ogImage = data.ogImage || "";
     statsDetail.dataset.shortCode = data.shortCode;
   } catch (err) {
     statsDetail.hidden = true;
@@ -316,8 +406,7 @@ function toLocalInput(iso) {
 }
 
 function displayNameFromEmail(email) {
-  const local = String(email || "").split("@")[0] || "User";
-  return local.slice(0, 64);
+  return String(email || "").split("@")[0]?.slice(0, 64) || "User";
 }
 
 authCancel.addEventListener("click", () => authDialog.close());
@@ -333,7 +422,9 @@ authForm.addEventListener("submit", async (event) => {
     currentUser = data.user;
     authDialog.close();
     renderAuthStatus();
+    await loadOrgMeta();
     await loadMyLinks();
+    await loadWebhooks();
   } catch (err) {
     showError(authError, err.message);
   } finally {
@@ -355,7 +446,9 @@ registerBtn.addEventListener("click", async () => {
     currentUser = data.user;
     authDialog.close();
     renderAuthStatus();
+    await loadOrgMeta();
     await loadMyLinks();
+    await loadWebhooks();
   } catch (err) {
     showError(authError, err.message);
   } finally {
@@ -371,18 +464,38 @@ form.addEventListener("submit", async (event) => {
   if (anonTip) anonTip.hidden = true;
 
   submitBtn.disabled = true;
-  const originalUrl = document.getElementById("originalUrl").value.trim();
+  const body = {
+    originalUrl: document.getElementById("originalUrl").value.trim(),
+  };
   const customAlias = document.getElementById("customAlias").value.trim();
   const expiresLocal = document.getElementById("expiresAt").value;
-  const password = document.getElementById("linkPassword").value;
-  const disabled = document.getElementById("linkDisabled").checked;
-
-  const body = { originalUrl };
   if (customAlias) body.customAlias = customAlias;
   if (expiresLocal) body.expiresAt = new Date(expiresLocal).toISOString();
+
+  const utmSource = document.getElementById("utmSource").value.trim();
+  const utmMedium = document.getElementById("utmMedium").value.trim();
+  const utmCampaign = document.getElementById("utmCampaign").value.trim();
+  if (utmSource) body.utmSource = utmSource;
+  if (utmMedium) body.utmMedium = utmMedium;
+  if (utmCampaign) body.utmCampaign = utmCampaign;
+
   if (currentUser) {
-    body.disabled = disabled;
+    body.disabled = document.getElementById("linkDisabled").checked;
+    const password = document.getElementById("linkPassword").value;
     if (password) body.password = password;
+    const folderId = document.getElementById("linkFolder").value;
+    if (folderId) body.folderId = folderId;
+    const tags = document.getElementById("linkTags").value
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (tags.length) body.tags = tags;
+    const ogTitle = document.getElementById("ogTitle").value.trim();
+    const ogDescription = document.getElementById("ogDescription").value.trim();
+    const ogImage = document.getElementById("ogImage").value.trim();
+    if (ogTitle) body.ogTitle = ogTitle;
+    if (ogDescription) body.ogDescription = ogDescription;
+    if (ogImage) body.ogImage = ogImage;
   }
 
   try {
@@ -398,6 +511,7 @@ form.addEventListener("submit", async (event) => {
     if (anonTip) anonTip.hidden = Boolean(currentUser);
     if (currentUser) {
       minePage = 1;
+      await loadOrgMeta();
       await loadMyLinks();
     }
   } catch (err) {
@@ -424,16 +538,67 @@ copyBtn.addEventListener("click", async () => {
   }
 });
 
+document.getElementById("add-folder-btn").addEventListener("click", async () => {
+  showError(orgError, "");
+  try {
+    await api("/api/folders", {
+      method: "POST",
+      body: JSON.stringify({ name: document.getElementById("new-folder").value }),
+    });
+    document.getElementById("new-folder").value = "";
+    await loadOrgMeta();
+  } catch (err) {
+    showError(orgError, err.message);
+  }
+});
+
+document.getElementById("add-tag-btn").addEventListener("click", async () => {
+  showError(orgError, "");
+  try {
+    await api("/api/tags", {
+      method: "POST",
+      body: JSON.stringify({ name: document.getElementById("new-tag").value }),
+    });
+    document.getElementById("new-tag").value = "";
+    await loadOrgMeta();
+  } catch (err) {
+    showError(orgError, err.message);
+  }
+});
+
+webhookForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  showError(webhookError, "");
+  const events = [];
+  if (document.getElementById("webhook-created").checked) events.push("link.created");
+  if (document.getElementById("webhook-clicked").checked) events.push("link.clicked");
+  try {
+    await api("/api/webhooks", {
+      method: "POST",
+      body: JSON.stringify({
+        url: document.getElementById("webhook-url").value.trim(),
+        secret: document.getElementById("webhook-secret").value.trim() || undefined,
+        events,
+      }),
+    });
+    webhookForm.reset();
+    document.getElementById("webhook-created").checked = true;
+    document.getElementById("webhook-clicked").checked = true;
+    await loadWebhooks();
+  } catch (err) {
+    showError(webhookError, err.message);
+  }
+});
+
 refreshMineBtn.addEventListener("click", async () => {
   if (!currentUser) return;
   refreshMineBtn.disabled = true;
   const label = refreshMineBtn.textContent;
   refreshMineBtn.textContent = "Refreshing…";
   try {
+    await loadOrgMeta();
     await loadMyLinks();
-    if (selectedCode && !statsDetail.hidden) {
-      await loadStats(selectedCode);
-    }
+    if (selectedCode && !statsDetail.hidden) await loadStats(selectedCode);
   } finally {
     refreshMineBtn.disabled = false;
     refreshMineBtn.textContent = label || "Refresh";
@@ -448,10 +613,12 @@ mineSearch.addEventListener("input", () => {
   }, 250);
 });
 
-mineSort.addEventListener("change", () => {
-  minePage = 1;
-  loadMyLinks();
-});
+for (const el of [mineSort, mineFolder, mineTag]) {
+  el.addEventListener("change", () => {
+    minePage = 1;
+    loadMyLinks();
+  });
+}
 
 minePrev.addEventListener("click", () => {
   if (minePage > 1) {
@@ -488,6 +655,12 @@ document.getElementById("edit-link-btn").addEventListener("click", () => {
   document.getElementById("edit-expiresAt").value = toLocalInput(
     statsDetail.dataset.expiresAt
   );
+  document.getElementById("edit-folder").value = statsDetail.dataset.folderId || "";
+  document.getElementById("edit-tags").value = statsDetail.dataset.tags || "";
+  document.getElementById("edit-ogTitle").value = statsDetail.dataset.ogTitle || "";
+  document.getElementById("edit-ogDescription").value =
+    statsDetail.dataset.ogDescription || "";
+  document.getElementById("edit-ogImage").value = statsDetail.dataset.ogImage || "";
   document.getElementById("edit-password").value = "";
   document.getElementById("edit-clear-password").checked = false;
   document.getElementById("edit-disabled").checked = Boolean(
@@ -508,6 +681,14 @@ editForm.addEventListener("submit", async (event) => {
     originalUrl: document.getElementById("edit-originalUrl").value.trim(),
     customAlias: document.getElementById("edit-alias").value.trim(),
     disabled: document.getElementById("edit-disabled").checked,
+    folderId: document.getElementById("edit-folder").value || null,
+    tags: document.getElementById("edit-tags").value
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean),
+    ogTitle: document.getElementById("edit-ogTitle").value.trim() || null,
+    ogDescription: document.getElementById("edit-ogDescription").value.trim() || null,
+    ogImage: document.getElementById("edit-ogImage").value.trim() || null,
   };
   const expiresLocal = document.getElementById("edit-expiresAt").value;
   body.expiresAt = expiresLocal ? new Date(expiresLocal).toISOString() : null;
@@ -524,6 +705,7 @@ editForm.addEventListener("submit", async (event) => {
     });
     editDialog.close();
     selectedCode = updated.shortCode;
+    await loadOrgMeta();
     await loadMyLinks();
     await loadStats(updated.shortCode);
   } catch (err) {
@@ -535,9 +717,7 @@ document.getElementById("delete-link-btn").addEventListener("click", async () =>
   if (!selectedCode) return;
   if (!confirm(`Delete ${selectedCode}? This cannot be undone.`)) return;
   try {
-    await api(`/api/urls/${encodeURIComponent(selectedCode)}`, {
-      method: "DELETE",
-    });
+    await api(`/api/urls/${encodeURIComponent(selectedCode)}`, { method: "DELETE" });
     statsDetail.hidden = true;
     selectedCode = null;
     await loadMyLinks();

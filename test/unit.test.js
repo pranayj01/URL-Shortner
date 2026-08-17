@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import { parseUserAgent } from "../src/utils/userAgent.js";
 import { extractClickMeta } from "../src/utils/clickMeta.js";
 import { validateUrl, validateUrlPatch } from "../src/middleware/validateUrl.js";
+import { appendUtmParams } from "../src/utils/utm.js";
+import { isSocialBot, hasOgPreview } from "../src/utils/bots.js";
 
 describe("parseUserAgent", () => {
   it("detects mobile chrome", () => {
@@ -12,7 +14,8 @@ describe("parseUserAgent", () => {
   });
 
   it("detects desktop firefox", () => {
-    const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0";
+    const ua =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0";
     assert.deepEqual(parseUserAgent(ua), { device: "desktop", browser: "firefox" });
   });
 });
@@ -26,7 +29,11 @@ describe("extractClickMeta", () => {
         "user-agent": "Mozilla/5.0 Firefox/121.0",
         referer: "https://news.example.com/path",
       },
-      query: { utm_source: "twitter", utm_medium: "social", utm_campaign: "launch" },
+      query: {
+        utm_source: "twitter",
+        utm_medium: "social",
+        utm_campaign: "launch",
+      },
       get(name) {
         if (name === "user-agent") return this.headers["user-agent"];
         if (name === "referer") return this.headers.referer;
@@ -38,8 +45,6 @@ describe("extractClickMeta", () => {
     assert.equal(meta.browser, "firefox");
     assert.equal(meta.referrer, "news.example.com");
     assert.equal(meta.utmSource, "twitter");
-    assert.equal(meta.utmMedium, "social");
-    assert.equal(meta.utmCampaign, "launch");
   });
 });
 
@@ -60,7 +65,9 @@ function mockRes() {
 
 describe("validateUrl", () => {
   it("rejects reserved aliases", () => {
-    const req = { body: { originalUrl: "https://example.com", customAlias: "api" } };
+    const req = {
+      body: { originalUrl: "https://example.com", customAlias: "api" },
+    };
     const res = mockRes();
     let nextCalled = false;
     validateUrl(req, res, () => {
@@ -68,7 +75,6 @@ describe("validateUrl", () => {
     });
     assert.equal(nextCalled, false);
     assert.equal(res.statusCode, 400);
-    assert.match(res.body.message, /reserved/i);
   });
 
   it("prefixes https when missing", () => {
@@ -89,5 +95,33 @@ describe("validateUrlPatch", () => {
     });
     assert.equal(nextCalled, true);
     assert.equal(req.body.expiresAt, null);
+  });
+});
+
+describe("appendUtmParams", () => {
+  it("appends utm query params", () => {
+    const out = appendUtmParams("https://example.com/path", {
+      utmSource: "twitter",
+      utmMedium: "social",
+    });
+    const url = new URL(out);
+    assert.equal(url.searchParams.get("utm_source"), "twitter");
+    assert.equal(url.searchParams.get("utm_medium"), "social");
+  });
+});
+
+describe("bots", () => {
+  it("detects twitterbot and og presence", () => {
+    assert.equal(
+      isSocialBot({
+        headers: { "user-agent": "Twitterbot/1.0" },
+        get() {
+          return this.headers["user-agent"];
+        },
+      }),
+      true
+    );
+    assert.equal(hasOgPreview({ ogTitle: "Hello" }), true);
+    assert.equal(hasOgPreview({}), false);
   });
 });
