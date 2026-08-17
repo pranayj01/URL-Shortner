@@ -4,7 +4,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { toNodeHandler } from "better-auth/node";
-import { auth } from "./auth.js";
+import { auth, resolveAuthBaseURL } from "./auth.js";
 import { apiRouter, redirectRouter } from "./routes/urlRoutes.js";
 import { healthCheck } from "./controllers/healthController.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -15,16 +15,29 @@ const publicDir = path.join(__dirname, "..", "public");
 
 const app = express();
 
-const allowedOrigin = (
-  process.env.BETTER_AUTH_URL ||
-  process.env.BASE_URL ||
-  process.env.RENDER_EXTERNAL_URL ||
-  true
-);
-
 app.use(
   cors({
-    origin: allowedOrigin === true ? true : String(allowedOrigin).replace(/\/$/, ""),
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      const allowed = new Set();
+      for (const value of [
+        resolveAuthBaseURL(),
+        process.env.BETTER_AUTH_URL,
+        process.env.BASE_URL,
+        process.env.RENDER_EXTERNAL_URL,
+      ].filter(Boolean)) {
+        try {
+          const url = new URL(value.includes("://") ? value : `https://${value}`);
+          allowed.add(`${url.protocol}//${url.host}`);
+        } catch {
+          allowed.add(String(value).replace(/\/$/, ""));
+        }
+      }
+      if (allowed.has(origin) || process.env.NODE_ENV !== "production") {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })

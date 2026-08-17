@@ -172,7 +172,7 @@ No special code changes are required. Create **3 services** in the same region, 
 
 - Build Command must **not** be `npm start`
 - `DATABASE_URL` must be the **External** URL (host includes `.render.com`)
-- `BASE_URL` must be `https://your-app.onrender.com` (no trailing slash)
+- `BASE_URL` and `BETTER_AUTH_URL` must be `https://your-app.onrender.com` (no trailing slash, **not** localhost). Login fails with “Invalid origin” if these still point at localhost.
 - Free Render apps sleep when idle; first request can take ~30–60s
 
 ## Intentionally deferred

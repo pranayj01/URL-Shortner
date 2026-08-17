@@ -2,6 +2,7 @@ import "./config/loadEnv.js";
 import { spawn } from "node:child_process";
 import { applyDatabaseUrl } from "./config/databaseUrl.js";
 import { redisHostname } from "./config/connectRedis.js";
+import { resolveAuthBaseURL } from "./auth.js";
 
 applyDatabaseUrl();
 
@@ -18,6 +19,8 @@ if (redisHost) {
 } else {
   console.log("REDIS_URL is not set; redirects skip cache and clicks save to Postgres");
 }
+
+console.log(`Using auth base URL: ${resolveAuthBaseURL()}`);
 
 const runMigrations =
   process.env.RUN_MIGRATIONS === "true" ||
