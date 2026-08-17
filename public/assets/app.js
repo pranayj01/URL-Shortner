@@ -176,8 +176,7 @@ function clearLocalAuthState() {
   showError(statsError, "");
   setOwnerOnlyVisible(false);
   if (shortenHint) {
-    shortenHint.textContent =
-      "Anyone can create a short link. Log in to save links, tags, OG previews, and webhooks.";
+    shortenHint.textContent = "Paste a long URL. Log in to save links and see analytics.";
   }
 }
 
@@ -196,8 +195,7 @@ function renderAuthStatus() {
     insightsPanel.hidden = false;
     setOwnerOnlyVisible(true);
     if (shortenHint) {
-      shortenHint.textContent =
-        "Logged-in links support folders, tags, OG previews, and webhooks.";
+        shortenHint.textContent = "Logged-in links are saved to Your links."
     }
     document.getElementById("logout-btn").addEventListener("click", async () => {
       try {
