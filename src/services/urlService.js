@@ -218,8 +218,8 @@ export async function createShortUrl(
   }
 }
 
-export async function findOriginalUrl(code) {
-  const cached = await readCachedUrl(code);
+export async function findOriginalUrl(code, { skipCache = false } = {}) {
+  const cached = skipCache ? null : await readCachedUrl(code);
   if (cached?.originalUrl && !cached.hasPassword && !cached.disabled && !cached.hasOg) {
     return {
       originalUrl: cached.originalUrl,

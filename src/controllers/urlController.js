@@ -83,7 +83,8 @@ export async function shortenUrl(req, res, next) {
 export async function redirectUrl(req, res, next) {
   try {
     const { code } = req.params;
-    const urlData = await findOriginalUrl(code);
+    const bot = isSocialBot(req);
+    const urlData = await findOriginalUrl(code, { skipCache: bot });
 
     if (!urlData) {
       if (wantsHtml(req)) {
@@ -135,7 +136,6 @@ export async function redirectUrl(req, res, next) {
       await cachePublicRedirect(code, urlData);
     }
 
-    const bot = isSocialBot(req);
     if (bot && hasOgPreview(urlData)) {
       res
         .status(200)
