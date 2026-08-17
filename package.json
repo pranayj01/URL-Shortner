@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/start.js",
     "start": "node src/start.js",
-    "build": "npx prisma generate",
+    "build": "npx prisma generate && npx prisma migrate deploy",
     "test": "node --import ./test/preload.js --test test/unit.test.js test/api.test.js",
     "worker:clicks": "node src/workers/clickWorker.js",
     "benchmark:redirect": "node scripts/benchmark-redirect.mjs"
